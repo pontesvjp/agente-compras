@@ -1,0 +1,9 @@
+# enunciado do case (traz a chave da OpenRouter) e plano local
+case/
+PLAN.md
+
+.env
+node_modules/
+dist/
+coverage/
+*.log
