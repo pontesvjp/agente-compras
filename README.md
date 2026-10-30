@@ -82,7 +82,7 @@ navegador ──:8080──► chat (React, servido por nginx)
 1. O chat manda o pedido para `POST /api/requisicoes`.
 2. O backend entrega ao modelo o pedido, o prompt e as ferramentas que leu do servidor MCP.
 3. O modelo pede uma ferramenta, o backend executa no MCP e devolve o resultado. Isso se repete até o modelo responder, com no máximo 8 voltas.
-4. Se achou o que atende, o modelo chama `criar_requisicao`. O servidor MCP confere preço, estoque e pedido mínimo na fonte e grava numa transação.
+4. Se achou o que atende, o modelo chama `criar_requisicao`. O servidor MCP confere preço, estoque e pedido mínimo na fonte, aplica a política de compras da tabela e grava numa transação.
 5. O backend devolve a requisição lida do banco, a mensagem do modelo e as ferramentas chamadas.
 
 Não existe fluxo fixo no código: quem decide a próxima ferramenta é o modelo. É isso que separa um
@@ -93,6 +93,7 @@ agente de um bot de roteiro.
 | `buscar_produtos` | `termo`, em inglês e no singular | id, título, preço, estoque, pedido mínimo, categoria e marca de cada produto |
 | `detalhar_produto` | `id` | o produto completo, com garantia e prazo de envio |
 | `criar_requisicao` | itens (`produto_id`, `quantidade`, teto opcional) e justificativa | número, itens, total e status. **Não recebe preço** |
+| `consultar_politica` | `categoria`, opcional | as regras que valem: categoria permitida, teto, quantidade máxima e alçada |
 
 | Rota | Faz |
 |---|---|
@@ -101,6 +102,7 @@ agente de um bot de roteiro.
 | `GET /api/requisicoes/{id}` | Uma requisição |
 | `GET /api/atendimentos/{id}` | Trilha do atendimento: ferramentas, argumentos, tempos, tokens e custo |
 | `GET /api/metricas` | Volume, taxa de atendidas, falhas, tempo p50/p95 e custo médio |
+| `GET /api/politica` · `PUT /api/politica` · `PUT /api/politica/categorias/{categoria}` | Lê e altera a política de compras. Vale no pedido seguinte, sem reiniciar |
 | `GET /api/health` | Estado do banco, do MCP e da chave do LLM |
 
 ## Decisões principais
@@ -115,12 +117,15 @@ agente de um bot de roteiro.
 8. **Instrumentado desde o começo.** Cada atendimento grava as ferramentas chamadas, os tempos, os tokens e o custo, e `/api/metricas` resume.
 9. **Uma porta só.** O nginx serve o chat e repassa `/api` e `/mcp`. Backend e Postgres não ficam expostos, então não brigam com o que já roda na máquina.
 10. **Modelo:** `anthropic/claude-haiku-5.5` (barato, rápido e bom em ferramentas), com `deepseek/deepseek-v4.1-flash` de reserva, os dois pela OpenRouter e por variável de ambiente. A avaliação compara os dois.
+11. **Regra de negócio em tabela, infraestrutura no `.env`.** Alçada, teto, quantidade máxima e categoria bloqueada são decisão de quem compra e mudam sem deploy, numa tabela do mesmo Postgres, com histórico gravado por trigger. Chave, modelo e URLs ficam no `.env`.
 
 ## Quando algo falha
 
 | Situação | O que o chat mostra | HTTP |
 |---|---|---|
 | Nada do catálogo atende | O que faltou: preço mais baixo encontrado, pedido mínimo, estoque | `200`, `nao_atendida` |
+| Pedido fora da política (categoria bloqueada, acima do teto ou da quantidade máxima) | A regra que barrou e o motivo cadastrado | `200`, `nao_atendida` |
+| Total acima da alçada | A requisição é criada com o selo "aguardando aprovação" e a regra que a levou para lá | `201`, `aguardando_aprovacao` |
 | DummyJSON fora ou lenta (5 s, com uma nova tentativa) | "O catálogo de produtos não respondeu. Tente de novo em instantes." | `503`, `CATALOGO_INDISPONIVEL` |
 | Chave da OpenRouter inválida ou vencida | "A chave do modelo de IA é inválida ou venceu. Troque `OPENROUTER_API_KEY` no `.env`." | `503`, `LLM_CHAVE_INVALIDA` |
 | OpenRouter com limite de taxa ou fora | Nova tentativa respeitando `Retry-After`, depois o modelo de reserva; se nada responder, mensagem clara | `503`, `LLM_INDISPONIVEL` |
@@ -148,7 +153,7 @@ Roda lint, checagem de tipos e testes sem chave de LLM e sem internet. A DummyJS
 docker compose run --rm testes npm run avaliar
 ```
 
-Com o ambiente no ar e a chave no `.env`, manda 5 pedidos ao backend e confere o resultado **no banco**,
+Com o ambiente no ar e a chave no `.env`, manda 6 pedidos ao backend e confere o resultado **no banco**,
 não no texto do modelo. Mostra acertos, tempo e custo de cada modelo.
 
 | # | Pedido | Esperado |
@@ -158,17 +163,40 @@ não no texto do modelo. Mostra acertos, tempo e custo de cada modelo.
 | 3 | 5 laptops até US$ 1.000 cada | Não atendida: o mais barato custa US$ 1.099,99 |
 | 4 | 2 cadeiras para a sala de reunião, até US$ 600 | Não atendida: a única cadeira tem pedido mínimo de 5 |
 | 5 | 10 monitores para o time de desenvolvimento | Não atendida: a busca só traz uma panela e um relógio |
+| 6 | Preciso de uma moto para as entregas | Não atendida pela política: `motorcycle` está bloqueada, com o motivo |
+
+## Política de compras
+
+As regras de compra ficam em tabelas do Postgres, não no código. Elas são carregadas por migration
+quando o ambiente sobe e podem ser alteradas pela aba "Regras" do chat ou pela API.
+
+| Regra (carga inicial) | Valor |
+|---|---|
+| Alçada geral | US$ 5.000: acima disso, a requisição espera aprovação |
+| Valor máximo por requisição | US$ 20.000 |
+| `laptops` | Teto de US$ 2.500 por unidade, até 20 unidades |
+| `furniture` | Alçada própria de US$ 2.000 |
+| `vehicle`, `motorcycle` | Bloqueadas: "veículo segue o processo de frota" |
+| `fragrances`, `beauty`, `skin-care` | Bloqueadas: "fora da política de compras corporativas" |
+
+```bash
+curl -s -X PUT http://localhost:8080/api/politica/categorias/laptops \
+  -H "content-type: application/json" \
+  -d '{"teto_unitario_usd": 1000}'
+```
+
+Depois disso, o pedido de exemplo vira "não atendida", sem reiniciar nada. Cada requisição guarda as
+regras que valiam na hora, e toda alteração da política fica no histórico (`politica_historico`).
 
 ## Configuração
 
-Tudo no `.env` (modelo em `.env.example`):
+Infraestrutura e segredo ficam no `.env` (modelo em `.env.example`):
 
 | Variável | Padrão | Para quê |
 |---|---|---|
 | `OPENROUTER_API_KEY` | (vazia) | Chave da OpenRouter. Sem ela tudo sobe, e o chat avisa que falta a chave |
 | `LLM_MODELO` | `anthropic/claude-haiku-5.5` | Modelo principal |
 | `LLM_MODELO_RESERVA` | `deepseek/deepseek-v4.1-flash` | Usado se o principal falhar |
-| `ALCADA_USD` | `5000` | Acima desse total a requisição nasce `aguardando_aprovacao` |
 | `DUMMYJSON_BASE_URL` | `https://dummyjson.com` | Aponte para um endereço morto para ver o tratamento de falha |
 | `DUMMYJSON_TIMEOUT_MS` | `5000` | Tempo máximo de cada chamada ao catálogo |
 | `PORTA` | `8080` | Porta do chat na sua máquina |
@@ -188,7 +216,7 @@ apps/chat/              chat em React + Vite, servido por nginx
 services/backend/       Fastify: laço do agente, rotas e migrations
 services/mcp-server/    servidor MCP e cliente da DummyJSON
 packages/shared/        schemas zod e tipos usados pelos três
-scripts/avaliar.ts      avaliação com 5 pedidos
+scripts/avaliar.ts      avaliação com 6 pedidos
 docker-compose.yml
 ```
 
@@ -226,8 +254,9 @@ Os dois arquivos que mostram esse processo ficam no repositório:
 - [x] Desenho do projeto (este README), plano por etapas (`PLAN.md`), regras do repositório (`CLAUDE.md`) e configuração base
 - [ ] Servidor MCP com `buscar_produtos` e `detalhar_produto`, com testes
 - [ ] Postgres com migrations e `criar_requisicao` com as travas
+- [ ] Política de compras em tabela, com histórico e `consultar_politica`
 - [ ] Backend com o laço do agente, a trilha de atendimentos e as métricas
-- [ ] Chat em React
+- [ ] Chat em React, com a aba "Regras"
 - [ ] Docker Compose com as quatro peças
-- [ ] Avaliação com 5 pedidos, CI e alçada
+- [ ] Avaliação com 6 pedidos, CI e selo de alçada
 - [ ] Ensaio em clone limpo e entrega

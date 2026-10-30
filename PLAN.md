@@ -26,6 +26,7 @@ documenta e explica suas decisões"*. A vaga e o blog do ME dizem o que "bem int
 | Tratamento de erro, log, sustentação | Anúncio: "o tratamento de erro, logs e plano de sustentação são parte da entrega" | Timeout, retry, erros com código, log JSON com `request_id` de ponta a ponta |
 | Medir volume, acerto, tempo e falha | Anúncio: "instrumentará a solução… prova de valor" | Tabela de atendimentos (trilha de auditoria) + `GET /metricas` + script de avaliação com taxa de acerto |
 | Alçada e humano no loop | Post "Sistemas multiagentes em compras" do blog do ME (30/09/2026) | Requisição acima da alçada nasce `aguardando_aprovacao` |
+| "Alçada por valor e tipo de compra" e "política de categorias" | Mesmo post do blog do ME | Política de compras em tabela no Postgres (alçada, teto e quantidade por categoria, categoria bloqueada), lida a cada pedido e alterável sem deploy |
 | Integração B2B: auth, webhooks, rate limit, filas | Requisitos da vaga | Idempotency-Key no POST, rate limit, retry com `Retry-After` na OpenRouter |
 | Decidir entre automação tradicional e IA | Anúncio | Conta e validação ficam em código; o LLM só interpreta o pedido e escolhe o produto |
 | MCP e Claude Code | Diferenciais da vaga; o ME tem servidor MCP próprio ("MCP OData Connect") | Servidor MCP de verdade (Streamable HTTP), que também funciona plugado no Claude Code |
@@ -66,6 +67,7 @@ Consultado em 30/10/2026:
 | **React + Vite**, servido por **nginx**, que também faz proxy de `/api` e `/mcp` | Uma porta só (`http://localhost:8080`), sem CORS e sem URL de backend embutida no build |
 | **Vitest** nos testes, **Biome** de lint e formatação | Um binário só para lint e formatação, rápido no CI |
 | `temperature: 0` e no máximo 8 voltas no laço | Resposta estável, e a rodada não fica presa em loop |
+| **Regra de negócio em tabela; `.env` só com infraestrutura e segredo** | Alçada, teto, quantidade máxima e categoria bloqueada são decisão do cliente e mudam sem deploy. Modelo, chave, URL e timeout são do ambiente. Não entra um segundo banco: mais um container é mais uma chance de não subir na máquina de quem avalia |
 
 **Idioma do código:** termos do domínio em português, como o case e o ME usam (`requisicao`,
 `buscar_produtos`, `valor_total`, `alcada`). O técnico fica em inglês (`server`, `handler`, `retry`).
@@ -91,9 +93,13 @@ packages/shared: schemas zod e tipos usados pelos três
 |---|---|---|---|
 | `buscar_produtos` | `termo` (inglês, singular), `limite?` | lista enxuta: `id, titulo, preco, estoque, pedido_minimo, disponibilidade, categoria, marca` | Usa `select=` da DummyJSON e devolve só os campos úteis, o que corta tokens. Vazio volta com `dica`. Cache de 60 s |
 | `detalhar_produto` | `id` | produto completo: garantia, prazo de envio, avaliação | 404 vira erro `PRODUTO_NAO_ENCONTRADO` |
-| `criar_requisicao` (diferencial) | `itens: [{produto_id, quantidade, preco_maximo_unitario?}]`, `solicitante?`, `justificativa` | número da requisição, itens, total, status | **Não recebe preço.** Busca cada produto na DummyJSON, confere estoque, pedido mínimo e teto de preço, calcula o total em centavos e grava numa transação. Se algo viola, recusa com o motivo, e o modelo tem de dizer o que falta |
+| `criar_requisicao` (diferencial) | `itens: [{produto_id, quantidade, preco_maximo_unitario?}]`, `solicitante?`, `justificativa` | número da requisição, itens, total, status | **Não recebe preço.** Busca cada produto na DummyJSON, confere estoque, pedido mínimo e teto de preço, calcula o total em centavos, aplica a política de compras e grava numa transação. Se algo viola, recusa com o motivo, e o modelo tem de dizer o que falta |
+| `sugerir_para_necessidade` (diferencial, modo consultivo) | `descricao` (o problema, com as palavras da pessoa) | até 3 necessidades prováveis, cada uma com as categorias e os termos de busca que a resolvem e a pergunta que falta fazer | Busca textual em português (`tsvector`) na tabela `necessidades`. Só sugere o que existe no mapa e no catálogo. Não devolve preço |
+| `consultar_politica` (diferencial) | `categoria?` | regras que valem: categoria permitida ou bloqueada, teto unitário, quantidade máxima, alçada, critério de escolha | Só leitura. Serve para o modelo escolher dentro da regra e explicar a recusa. Quem garante a regra continua sendo o `criar_requisicao` |
 
 - Todas declaram `outputSchema` e devolvem `structuredContent`. As de leitura levam `readOnlyHint: true`.
+- A descrição de cada ferramenta segue um padrão fixo: o que faz, **quando chamar**, **quando não chamar** (e qual usar no lugar) e **o que ela não devolve** (ex.: "não devolve preço"). É o que mais pesa em "ferramentas bem definidas".
+- `buscar_produtos` resolve sinônimo antes de ir à DummyJSON: a tabela `sinonimos` troca "notebook" por `laptop`, "celular" por `smartphone`, "cadeira" por `chair`. A busca deixa de depender de a IA acertar o inglês no singular.
 - Erro de ferramenta volta como `isError: true` com `codigo`: `CATALOGO_INDISPONIVEL`, `CATALOGO_LENTO`,
   `PRODUTO_NAO_ENCONTRADO`, `REGRA_VIOLADA`. O backend usa o código para a mensagem do chat; não depende do texto do modelo.
 - Chamada à DummyJSON com `AbortSignal.timeout(5000)` e um retry com espera em 5xx ou timeout (só GET, que é idempotente).
@@ -107,6 +113,8 @@ packages/shared: schemas zod e tipos usados pelos três
 | `GET /requisicoes/:id` | Uma requisição |
 | `GET /atendimentos/:id` | Trilha de auditoria: ferramentas chamadas, argumentos, tempo de cada uma, tokens, custo, modelo |
 | `GET /metricas` | Volume, % atendidas, % não atendidas, % erro, tempo p50/p95, custo médio |
+| `GET /politica` · `PUT /politica` · `PUT /politica/categorias/:categoria` | Lê e altera a política de compras. Vale no pedido seguinte, sem reiniciar nada |
+| `POST /requisicoes/:id/aprovar` · `POST /requisicoes/:id/reprovar` | Decide a requisição que está `aguardando_aprovacao`. Reprovar exige `motivo`; a decisão fica em `aprovacoes` |
 | `GET /health` | Banco, MCP e LLM (`sem_chave` se faltar a chave) |
 
 ### Banco
@@ -117,10 +125,33 @@ requisicoes        (id, numero 'REQ-000123', solicitante, pedido_original, statu
 requisicao_itens   (id, requisicao_id fk, produto_id, titulo, preco_unitario, quantidade, subtotal)
 atendimentos       (id, pedido, resultado, modelo, tokens_entrada, tokens_saida, custo_usd,
                     duracao_ms, chamadas jsonb, erro, idempotency_key unique, criado_em)
+politica_compra    (id = 1, criterio_escolha 'menor_preco' | 'melhor_avaliacao', alcada_usd,
+                    valor_maximo_requisicao_usd, atualizado_em)
+regras_categoria   (categoria pk, permitida, teto_unitario_usd, quantidade_maxima, alcada_usd, motivo)
+alcadas_solicitante (solicitante pk, alcada_usd, valida_ate, motivo)   -- sobrepõe categoria e geral enquanto vigente
+aprovacoes         (id, requisicao_id fk, decisao 'aprovada' | 'reprovada', aprovador, motivo, decidido_em)
+politica_historico (id, tabela, chave, antes jsonb, depois jsonb, alterado_em)   -- preenchida por trigger
+sinonimos          (termo pk, busca, ativo)                      -- 'notebook' -> 'laptop'
+necessidades       (id, problema, palavras_chave, categorias text[], termos_busca text[], pergunta, busca tsvector)
+conversas          (id, criado_em) e mensagens (id, conversa_id, papel, conteudo, criado_em)
+propostas          (id, conversa_id, itens jsonb, criada_em, confirmada_em)   -- só o modo consultivo
 ```
 
-`status` aceita `aberta` ou `aguardando_aprovacao` (acima de `ALCADA_USD`, padrão 5.000). Preço e
-título são copiados para o item no momento da compra, porque o catálogo pode mudar depois.
+`status` aceita `aberta` ou `aguardando_aprovacao`: acima da alçada da categoria, se houver, senão da
+geral (padrão 5.000). Preço e título são copiados para o item no momento da compra, porque o catálogo
+pode mudar depois. A requisição guarda em `regras_aplicadas jsonb` as regras que valiam na hora: a
+auditoria responde "por que esta foi para aprovação" mesmo depois de a política mudar.
+
+**Carga inicial da política** (migration, para funcionar na máquina de quem avalia sem passo manual):
+
+| Regra | Valor | Por quê |
+|---|---|---|
+| Alçada geral | US$ 5.000 | Acima disso, aprovação humana |
+| Valor máximo por requisição | US$ 20.000 | Acima disso, recusa |
+| `laptops` | teto US$ 2.500, até 20 un. | Mostra o teto da categoria sobrepondo o do pedido |
+| `furniture` | alçada US$ 2.000 | Mostra a alçada da categoria sobrepondo a geral |
+| `vehicle`, `motorcycle` | bloqueadas: "veículo segue o processo de frota" | Mostra a categoria bloqueada com motivo |
+| `fragrances`, `beauty`, `skin-care` | bloqueadas: "fora da política de compras corporativas" | Idem |
 
 ---
 
@@ -146,10 +177,11 @@ O histórico vai junto na entrega, então os commits são pequenos e na ordem em
 - Commits: `feat: cliente da DummyJSON com timeout e retry` → `feat: servidor MCP com buscar_produtos e detalhar_produto` → `test: testes das ferramentas do MCP sem LLM`
 
 ### Etapa 2 · Banco e `criar_requisicao` (sáb)
-1. Migrations SQL (`001_requisicoes.sql`, `002_atendimentos.sql`) e o migrador do boot.
-2. `criar_requisicao` com as travas (preço da fonte, estoque, mínimo, teto, alçada) numa transação.
-3. Testes da ferramenta com Postgres de verdade (container no CI e o do compose local), incluindo a recusa de cada regra.
-- Commits: `feat: migrations do Postgres` → `feat: criar_requisicao com validação de preço, estoque e pedido mínimo`
+1. Migrations SQL (`001_requisicoes.sql`, `002_atendimentos.sql`, `003_politica_compra.sql` com a carga inicial e o trigger de histórico) e o migrador do boot.
+2. `criar_requisicao` com as travas (preço da fonte, estoque, mínimo, teto) e a política lida da tabela a cada chamada (categoria bloqueada, teto e quantidade da categoria, valor máximo, alçada), numa transação. Grava `regras_aplicadas`.
+3. `consultar_politica` (só leitura).
+4. Testes com Postgres de verdade (container no CI e o do compose local), incluindo a recusa de cada regra e a mudança de regra valendo no pedido seguinte.
+- Commits: `feat: migrations do Postgres` → `feat: criar_requisicao com validação de preço, estoque e pedido mínimo` → `feat: política de compras em tabela, com histórico por trigger`
 
 ### Etapa 3 · Backend e agente (sáb à tarde / dom)
 1. Cliente MCP no backend (lista as ferramentas no boot e reconecta se o MCP cair).
@@ -162,8 +194,9 @@ O histórico vai junto na entrega, então os commits são pequenos e na ordem em
    - entre os que atendem, escolha o de menor preço, com desempate pela avaliação, salvo se o pedido pedir outro critério;
    - se nada atender, não chame `criar_requisicao`; diga o que falta (mais barato encontrado, mínimo exigido, estoque);
    - responda em português.
-4. Rotas, trilha de auditoria por atendimento, `Idempotency-Key`, rate limit (`@fastify/rate-limit`), erro da OpenRouter tratado: 401 = "chave inválida ou expirada, troque no `.env`", 429 = retry com `Retry-After`, timeout total de 60 s.
+4. Rotas (incluindo `GET/PUT /politica`, com zod no corpo), trilha de auditoria por atendimento, `Idempotency-Key`, rate limit (`@fastify/rate-limit`), erro da OpenRouter tratado: 401 = "chave inválida ou expirada, troque no `.env`", 429 = retry com `Retry-After`, timeout total de 60 s.
 5. Teste do laço com um **LLM falso roteirizado**: prova que o código não tem fluxo fixo, porque a ordem das ferramentas muda conforme o roteiro.
+6. **Trava do texto:** antes de responder, o código confere que todo valor em US$ escrito pelo modelo saiu de uma ferramenta desta rodada. Se aparecer número que não veio de ferramenta, a mensagem é trocada por uma montada com os dados do banco, e o atendimento registra o caso.
 - Commits: `feat: laço do agente com OpenRouter e ferramentas do MCP` → `feat: rotas de requisições e trilha de atendimentos` → `test: laço do agente com LLM falso`
 
 ### Etapa 4 · Chat (dom)
@@ -172,7 +205,8 @@ O histórico vai junto na entrega, então os commits são pequenos e na ordem em
 3. Mostra as ferramentas chamadas (diferencial): chips "buscar_produtos('laptop') · 412 ms".
 4. Estados claros: carregando ("consultando o catálogo…"), não atendida (o que falta), catálogo fora, chave expirada.
 5. Lista das requisições salvas (`GET /requisicoes`) numa aba.
-- Commit: `feat: chat em React com cartão da requisição e ferramentas chamadas`
+6. Aba "Regras": mostra e edita a política (`GET/PUT /politica`). É a demonstração de baixar o teto de laptops para US$ 1.000 e ver o mesmo pedido virar "não atendida", sem reiniciar nada.
+- Commits: `feat: chat em React com cartão da requisição e ferramentas chamadas` → `feat: aba de regras da política de compras`
 
 ### Etapa 5 · Docker (dom)
 1. Dockerfile multi-stage por serviço, usuário não-root, `npm ci`, imagem final só com o build.
@@ -196,12 +230,20 @@ O histórico vai junto na entrega, então os commits são pequenos e na ordem em
    | 3 | "5 laptops até US$ 1.000 cada" | Não atendida, e cita o mais barato (US$ 1.099,99) |
    | 4 | "2 cadeiras para a sala de reunião, até US$ 600" | Não atendida por pedido mínimo (a única cadeira exige 5) |
    | 5 | "10 monitores para o time de desenvolvimento" | Não atendida. A busca traz panela e relógio, e o agente não pode escolher |
+   | 6 | "Preciso de uma moto para as entregas" | Não atendida pela política: `motorcycle` bloqueada, com o motivo |
+   | 7 (modo consultivo) | "O pessoal de vendas externas não tem como mostrar o catálogo na visita. São 4 pessoas, até US$ 700 cada." | `precisa_confirmar` com tablets (ex.: 4 × iPad Mini 2021, US$ 499,99, mínimo 3) e nada gravado; depois de "pode", requisição criada |
    | extra | Qualquer pedido com `DUMMYJSON_BASE_URL` apontando para um endereço morto | `503` e mensagem clara no chat |
 
    Antes de fechar, reconferir os dados na DummyJSON, porque ela pode mudar.
 2. GitHub Actions: Biome, typecheck, testes (com serviço Postgres) e `docker compose build`. O workflow roda a cada push e vai junto no zip.
-3. Alçada (`ALCADA_USD`) com o selo "aguardando aprovação" no chat.
-- Commits: `feat: script de avaliação com 5 pedidos` → `ci: lint, typecheck, testes e build` → `feat: alçada de aprovação por valor`
+3. Selo "aguardando aprovação" no chat, com a regra que levou a requisição para a alçada.
+4. **Modo consultivo** (se o núcleo estiver pronto até domingo à noite). A pessoa sabe o problema, mas não sabe o que comprar:
+   - o modelo chama `sugerir_para_necessidade` com a descrição, escolhe a necessidade mais provável, busca no catálogo e **propõe** os itens com o porquê;
+   - a resposta volta como `precisa_confirmar`, com `conversa_id`, e nada é gravado;
+   - se faltar quantidade ou teto, ele pergunta em vez de supor;
+   - só depois de uma mensagem nova da pessoa confirmando, `criar_requisicao` grava. A trava fica no código: a ferramenta recusa proposta sem mensagem de confirmação posterior na conversa;
+   - o pedido direto ("3 laptops até US$ 2.000") continua num passo só, como o case pede.
+- Commits: `feat: script de avaliação com 6 pedidos` → `ci: lint, typecheck, testes e build` → `feat: selo de alçada no chat` → `feat: modo consultivo com sugestão por necessidade e confirmação`
 
 ### Etapa 7 · README, decisões e ensaio (seg 02/11)
 1. README revisado: comandos conferidos, exemplos trocados por saída real e a seção "Estado" retirada.
@@ -246,15 +288,20 @@ O histórico vai junto na entrega, então os commits são pequenos e na ordem em
 | # | Extra | Ligação com a vaga e a empresa | Custo |
 |---|---|---|---|
 | 1 | `criar_requisicao` com as travas no código | É o diferencial do case, feito do jeito certo: o agente decide quando gravar, mas não consegue gravar preço inventado | médio |
-| 2 | Trilha de auditoria + `/metricas` | É o "instrumentará… volume, taxa de acerto, tempo, falhas" do anúncio, e a "trilha de auditoria" do blog do ME | médio |
-| 3 | Script de avaliação com conferência no banco, comparando 2 modelos | Prova de valor com número, e decisão de modelo baseada em dado | baixo |
-| 4 | Ferramentas chamadas no chat | Diferencial do case, e prova visual de que o modelo decide | baixo |
-| 5 | Alçada por valor (`aguardando_aprovacao`) | Segue o post do ME sobre multiagentes (alçada e humano no loop) | baixo |
-| 6 | Idempotency-Key + rate limit + retry com `Retry-After` | Os três itens de "integração B2B" do requisito da vaga | baixo |
-| 7 | CI | Diferencial do case | baixo |
-| 8 | MCP plugável no Claude Code | Liga com o "MCP OData Connect" do ME e com o diferencial "MCP, Claude Code" da vaga | quase zero (só README) |
-| 9 | Pergunta de esclarecimento: pedido sem quantidade ou sem teto faz o agente perguntar em vez de supor (com `conversa_id`) | "Não inventa" levado ao pé da letra | médio, só se sobrar tempo |
-| 10 | Webhook de saída `requisicao.criada` com assinatura HMAC e retry | O ME tem 30+ eventos de webhook, e o FDE integra com o ERP do cliente | médio, só se sobrar tempo |
+| 2 | Política de compras em tabela (alçada, teto e quantidade por categoria, categoria bloqueada), com histórico por trigger e `consultar_politica` no MCP | "Alçada por valor e tipo de compra" e "política de categorias" do blog do ME. Cada cliente tem a sua política, e o FDE configura sem deploy | médio |
+| 2b | Fechar o ciclo da alçada: aprovar ou reprovar com motivo obrigatório (botões no cartão do chat) e alçada por solicitante com validade ("o gerente tem US$ 10 mil até 31/12") | Humano no loop de ponta a ponta, não só o selo. É como o ERP de uma distribuidora real trata pedido de compra: reprovação registrada com motivo e limite por pessoa com vigência | baixo |
+| 3 | Sinônimos em tabela na busca ("notebook" → `laptop`) e descrição das ferramentas no padrão quando chamar / quando não chamar / o que não devolve | Acerto maior sem depender do modelo traduzir; "ferramentas bem definidas" é critério de 25% | baixo |
+| 4 | Trava do texto: valor em US$ que não saiu de ferramenta não chega ao usuário | "Respostas sem invenção" garantido também no texto, não só no cartão | baixo |
+| 5 | Trilha de auditoria + `/metricas` | É o "instrumentará… volume, taxa de acerto, tempo, falhas" do anúncio, e a "trilha de auditoria" do blog do ME | médio |
+| 6 | Script de avaliação com conferência no banco, comparando 2 modelos | Prova de valor com número, e decisão de modelo baseada em dado | baixo |
+| 7 | Ferramentas chamadas no chat | Diferencial do case, e prova visual de que o modelo decide | baixo |
+| 8 | Aba "Regras" no chat para editar a política | Mostra ao vivo a regra mudando o resultado do agente | baixo |
+| 9 | Idempotency-Key + rate limit + retry com `Retry-After` | Os três itens de "integração B2B" do requisito da vaga | baixo |
+| 10 | CI | Diferencial do case | baixo |
+| 11 | MCP plugável no Claude Code | Liga com o "MCP OData Connect" do ME e com o diferencial "MCP, Claude Code" da vaga | quase zero (só README) |
+| 12 | **Modo consultivo:** a pessoa descreve o problema, o agente sugere o que resolve, pergunta o que falta e só grava depois da confirmação | É o FDE em miniatura: entender o problema antes da solução. O ME Genius já "sugere fornecedor pela especificação" | médio-alto, depois do núcleo |
+| 13 | Data de necessidade: a pessoa diz "preciso até sexta" e o agente compara com o prazo de envio da DummyJSON (`shippingInformation`, ex.: "Ships in 1 month") antes de propor | Mais um "não inventa": avisar que o prazo não atende em vez de prometer | médio, só se sobrar tempo |
+| 14 | Webhook de saída `requisicao.criada` com assinatura HMAC e retry | O ME tem 30+ eventos de webhook, e o FDE integra com o ERP do cliente | médio, só se sobrar tempo |
 
 **Fora de propósito:** autenticação de usuário, multi-tenant e fila de mensagens. Ficam no README,
 na seção "Para produção, eu faria", com uma linha cada, sem gastar o prazo.
@@ -276,3 +323,6 @@ na seção "Para produção, eu faria", com uma linha cada, sem gastar o prazo.
 | 30/10/2026 | Plano criado, antes de qualquer código | Fechar o desenho antes de gastar o prazo em código |
 | 30/10/2026 | README e `CLAUDE.md` escritos antes do código | O README vira a especificação, com o checklist "Estado" atualizado a cada etapa; o `CLAUDE.md` fixa as regras para toda sessão com a IA |
 | 30/10/2026 | O plano passou a ser versionado (antes ficava só na máquina) | Mostrar na entrega como o trabalho com IA foi conduzido |
+| 30/10/2026 | Política de compras em tabela no mesmo Postgres; `ALCADA_USD` saiu do `.env`; entrou `consultar_politica` no MCP e o pedido 6 na avaliação | Regra de negócio é do cliente e muda sem deploy; o blog do ME fala em alçada por valor e tipo de compra. Descartado um segundo banco: mais um container é mais risco de não subir |
+| 30/10/2026 | Entraram sinônimos em tabela, padrão de descrição das ferramentas, trava do texto e o modo consultivo (`sugerir_para_necessidade` + confirmação), que substitui o item "pergunta de esclarecimento" | Ideias trazidas de um agente de vendas que já pus em produção: busca tolerante a como o cliente escreve, valor só de ferramenta conferido em código, e o cliente que descreve o sintoma sem saber o produto. O modo consultivo fica depois do núcleo para não arriscar o prazo |
+| 30/10/2026 | Entraram aprovar/reprovar com motivo, alçada por solicitante com validade e, se sobrar tempo, a data de necessidade comparada ao prazo de envio | Vindo do processo de compras do ERP onde trabalho: pedido reprovado fica com motivo e usuário, e o limite de alçada é por pessoa, com data de fim e motivo |
