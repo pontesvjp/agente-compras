@@ -212,12 +212,15 @@ O mesmo servidor que o backend usa atende qualquer cliente MCP.
 ## Estrutura
 
 ```text
-apps/chat/              chat em React + Vite, servido por nginx
-services/backend/       Fastify: laço do agente, rotas e migrations
-services/mcp-server/    servidor MCP e cliente da DummyJSON
-packages/shared/        schemas zod e tipos usados pelos três
-scripts/avaliar.ts      avaliação com 6 pedidos
-docker-compose.yml
+apps/chat/                chat em React + Vite, servido por nginx
+services/mcp-server/      servidor MCP, cliente da DummyJSON e um teste por ferramenta
+services/backend/         Fastify: laço do agente, rotas e cliente MCP
+packages/shared/          schemas zod, tipos e regras puras (centavos, política)
+packages/db/              conexão, migrations e consultas
+avaliacao/personas.json   pedidos de teste por persona
+scripts/avaliar.ts        roda a avaliação e confere no banco
+Dockerfile                um só, com um target por serviço
+docker-compose.yml        postgres, mcp-server, backend e chat
 ```
 
 ## Como usei IA
