@@ -1,6 +1,5 @@
-# enunciado do case (traz a chave da OpenRouter) e plano local
+# enunciado do case (traz a chave da OpenRouter)
 case/
-PLAN.md
 
 .env
 node_modules/

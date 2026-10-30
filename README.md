@@ -201,7 +201,10 @@ par de programação:
 - **Plano e desenho:** a IA propôs etapas e alternativas, e eu revisei e decidi o desenho final e as regras de negócio (as travas do `criar_requisicao`, o critério de menor preço e a alçada).
 - **Código e testes:** gerados pela IA seguindo as regras do [`CLAUDE.md`](CLAUDE.md) e revisados por mim antes de cada commit.
 
-O `CLAUDE.md` é o arquivo que o Claude Code lê em toda sessão. Ele mostra o que eu exigi da ferramenta.
+Os dois arquivos que mostram esse processo ficam no repositório:
+
+- [`PLAN.md`](PLAN.md): o plano que montei com a IA antes do código, com a leitura do contexto, os dados que a IA conferiu nas APIs, as decisões e o registro de cada mudança de rumo.
+- [`CLAUDE.md`](CLAUDE.md): o arquivo que o Claude Code lê em toda sessão. Ele mostra o que eu exigi da ferramenta.
 
 ## Para produção, eu faria
 
@@ -220,7 +223,7 @@ O `CLAUDE.md` é o arquivo que o Claude Code lê em toda sessão. Ele mostra o q
 
 ## Estado
 
-- [x] Desenho do projeto (este README), regras do repositório (`CLAUDE.md`) e configuração base
+- [x] Desenho do projeto (este README), plano por etapas (`PLAN.md`), regras do repositório (`CLAUDE.md`) e configuração base
 - [ ] Servidor MCP com `buscar_produtos` e `detalhar_produto`, com testes
 - [ ] Postgres com migrations e `criar_requisicao` com as travas
 - [ ] Backend com o laço do agente, a trilha de atendimentos e as métricas
