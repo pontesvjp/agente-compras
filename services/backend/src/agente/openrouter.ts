@@ -50,7 +50,15 @@ const SEM_CHAVE =
   'Falta a chave do modelo de IA. Preencha OPENROUTER_API_KEY no .env e suba o ambiente de novo.';
 const CHAVE_INVALIDA =
   'A chave do modelo de IA é inválida ou venceu. Troque OPENROUTER_API_KEY no .env.';
+const SEM_CREDITO =
+  'A chave do modelo de IA está sem crédito (limite da chave atingido). Troque OPENROUTER_API_KEY no .env.';
 const SEM_TEMPO = 'O modelo de IA não respondeu a tempo. Tente de novo em instantes.';
+
+/**
+ * Teto de tokens de saída por volta. Sem ele a OpenRouter reserva o máximo do modelo (65 mil no
+ * Haiku) e recusa com 402 uma chave com pouco crédito. A resposta final tem até 3 frases.
+ */
+const MAXIMO_TOKENS_SAIDA = 1024;
 
 /** Falha que vale uma nova tentativa (429, 5xx, rede), com a espera já calculada. */
 class Retentavel {
@@ -105,7 +113,7 @@ export function criarModeloOpenRouter(opcoes: OpcoesOpenRouter): ModeloLlm {
       throw new ErroAgente('LLM_CHAVE_INVALIDA', CHAVE_INVALIDA);
     }
     if (resposta.status === 402) {
-      throw new ErroAgente('LLM_INDISPONIVEL', 'A conta da OpenRouter está sem crédito.');
+      throw new ErroAgente('LLM_CHAVE_INVALIDA', SEM_CREDITO, { cause: texto.slice(0, 300) });
     }
     if (resposta.status === 429 || resposta.status >= 500) {
       throw new Retentavel(
@@ -174,6 +182,7 @@ export function criarModeloOpenRouter(opcoes: OpcoesOpenRouter): ModeloLlm {
         messages: mensagens,
         ...(ferramentas.length > 0 ? { tools: ferramentas } : {}),
         temperature: 0,
+        max_tokens: MAXIMO_TOKENS_SAIDA,
         usage: { include: true },
       });
 

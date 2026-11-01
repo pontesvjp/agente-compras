@@ -89,6 +89,18 @@ describe('OpenRouter', () => {
     expect(resposta.chamadas[0]?.function.name).toBe('buscar_produtos');
   });
 
+  it('402 (chave sem crédito) vira LLM_CHAVE_INVALIDA, sem nova tentativa', async () => {
+    agente
+      .get(BASE)
+      .intercept({ path: CAMINHO, method: 'POST' })
+      .reply(402, { error: { message: 'requires more credits' } });
+
+    const erro = await completar().catch((e: unknown) => e);
+
+    expect(erro).toMatchObject({ codigo: 'LLM_CHAVE_INVALIDA' });
+    expect(String(erro)).toContain('sem crédito');
+  });
+
   it('5xx duas vezes vira LLM_INDISPONIVEL', async () => {
     agente.get(BASE).intercept({ path: CAMINHO, method: 'POST' }).reply(503, 'fora').times(2);
 
@@ -124,6 +136,7 @@ describe('OpenRouter', () => {
       model: 'anthropic/claude-haiku-5.5',
       models: ['anthropic/claude-haiku-5.5', 'deepseek/deepseek-v4.1-flash'],
       temperature: 0,
+      max_tokens: 1024,
       tools: [{ function: { name: 'buscar_produtos' } }],
     });
     expect(resposta).toEqual({
