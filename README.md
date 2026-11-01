@@ -260,8 +260,8 @@ Os dois arquivos que mostram esse processo ficam no repositório:
 - [x] Desenho do projeto (este README), plano por etapas (`PLAN.md`), regras do repositório (`CLAUDE.md`) e configuração base
 - [x] Esqueleto do monorepo (workspaces, TypeScript, Biome, Vitest)
 - [x] Servidor MCP com `buscar_produtos` e `detalhar_produto`, com testes
-- [ ] Postgres com migrations e `criar_requisicao` com as travas
-- [ ] Política de compras em tabela, com histórico e `consultar_politica`
+- [x] Postgres com migrations e `criar_requisicao` com as travas
+- [x] Política de compras em tabela, com histórico e `consultar_politica`
 - [ ] Backend com o laço do agente, a trilha de atendimentos e as métricas
 - [ ] Chat em React
 - [ ] Docker Compose com as quatro peças

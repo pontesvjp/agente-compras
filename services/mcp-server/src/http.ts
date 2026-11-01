@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import type { ClienteDummyJson } from './dummyjson/cliente.js';
-import type { Logger } from './logger.js';
-import { criarServidorMcp } from './servidor.js';
+import { z } from 'zod';
+import { criarServidorMcp, type DependenciasServidor } from './servidor.js';
 
 const LIMITE_CORPO_BYTES = 1_000_000;
+const uuid = z.uuid();
 
 function responderJson(res: ServerResponse, status: number, corpo: unknown): void {
   res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(corpo));
@@ -13,6 +13,11 @@ function responderJson(res: ServerResponse, status: number, corpo: unknown): voi
 
 function erroJsonRpc(res: ServerResponse, status: number, code: number, message: string): void {
   responderJson(res, status, { jsonrpc: '2.0', error: { code, message }, id: null });
+}
+
+function cabecalho(req: IncomingMessage, nome: string): string | undefined {
+  const valor = req.headers[nome];
+  return typeof valor === 'string' && valor !== '' ? valor : undefined;
 }
 
 async function lerCorpoJson(req: IncomingMessage): Promise<unknown> {
@@ -31,8 +36,7 @@ async function lerCorpoJson(req: IncomingMessage): Promise<unknown> {
 async function atenderMcp(
   req: IncomingMessage,
   res: ServerResponse,
-  cliente: ClienteDummyJson,
-  logger: Logger,
+  deps: DependenciasServidor,
 ): Promise<void> {
   if (req.method !== 'POST') {
     erroJsonRpc(res, 405, -32000, 'Use POST: este servidor MCP é stateless.');
@@ -45,7 +49,7 @@ async function atenderMcp(
     erroJsonRpc(res, 400, -32700, 'JSON inválido.');
     return;
   }
-  const servidor = criarServidorMcp({ cliente, logger });
+  const servidor = criarServidorMcp(deps);
   const transporte = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
@@ -58,11 +62,11 @@ async function atenderMcp(
   await transporte.handleRequest(req, res, corpo);
 }
 
-export function criarServidorHttp(cliente: ClienteDummyJson, logger: Logger): Server {
+export function criarServidorHttp(deps: Omit<DependenciasServidor, 'atendimentoId'>): Server {
   return createServer((req, res) => {
-    const cabecalho = req.headers['x-request-id'];
-    const requestId = typeof cabecalho === 'string' && cabecalho !== '' ? cabecalho : randomUUID();
-    const log = logger.child({ request_id: requestId });
+    const requestId = cabecalho(req, 'x-request-id') ?? randomUUID();
+    const atendimento = uuid.safeParse(cabecalho(req, 'x-atendimento-id'));
+    const logger = deps.logger.child({ request_id: requestId });
     const caminho = new URL(req.url ?? '/', 'http://localhost').pathname;
 
     if (caminho === '/health') {
@@ -70,8 +74,12 @@ export function criarServidorHttp(cliente: ClienteDummyJson, logger: Logger): Se
       return;
     }
     if (caminho === '/mcp') {
-      atenderMcp(req, res, cliente, log).catch((erro: unknown) => {
-        log.error({ err: erro }, 'falha ao atender /mcp');
+      atenderMcp(req, res, {
+        ...deps,
+        logger,
+        atendimentoId: atendimento.success ? atendimento.data : null,
+      }).catch((erro: unknown) => {
+        logger.error({ err: erro }, 'falha ao atender /mcp');
         if (!res.headersSent) erroJsonRpc(res, 500, -32603, 'Erro interno do servidor MCP.');
       });
       return;

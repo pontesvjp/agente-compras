@@ -14,7 +14,7 @@ export function resultadoErro(erro: unknown, logger: Logger): CallToolResult {
   const conhecido =
     erro instanceof ErroAgente
       ? erro
-      : new ErroAgente('CATALOGO_INDISPONIVEL', 'Erro inesperado ao consultar o catálogo.', {
+      : new ErroAgente('CATALOGO_INDISPONIVEL', 'Erro inesperado no servidor de catálogo.', {
           cause: erro,
         });
   if (!(erro instanceof ErroAgente)) logger.error({ err: erro }, 'erro inesperado na ferramenta');
@@ -23,7 +23,11 @@ export function resultadoErro(erro: unknown, logger: Logger): CallToolResult {
     content: [
       {
         type: 'text',
-        text: JSON.stringify({ codigo: conhecido.codigo, mensagem: conhecido.message }),
+        text: JSON.stringify({
+          codigo: conhecido.codigo,
+          mensagem: conhecido.message,
+          ...(conhecido.detalhes === undefined ? {} : { detalhes: conhecido.detalhes }),
+        }),
       },
     ],
   };

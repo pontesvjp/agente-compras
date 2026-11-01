@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 const configSchema = z.object({
+  DATABASE_URL: z.string().min(1, 'informe a URL do Postgres'),
   MCP_PORTA: z.coerce.number().int().positive().default(3001),
   DUMMYJSON_BASE_URL: z.url().default('https://dummyjson.com'),
   DUMMYJSON_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
