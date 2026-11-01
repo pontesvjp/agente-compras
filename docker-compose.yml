@@ -1,0 +1,108 @@
+# As quatro peças: postgres, mcp-server, backend e chat. Só o chat fica exposto, em ${PORTA:-8080}.
+# O serviço `testes` (e o Postgres dele) só sobe com `docker compose run --rm testes`.
+# Variáveis: o compose lê o .env da raiz (modelo em .env.example). Sem ele, tudo sobe com os padrões.
+name: agente-compras
+
+x-banco: &url-banco postgres://compras:compras@postgres:5432/compras
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: compras
+      POSTGRES_PASSWORD: compras
+      POSTGRES_DB: compras
+    volumes:
+      - dados:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U compras -d compras"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # Roda as migrations no boot e só fica saudável depois delas: o backend sobe com as tabelas prontas.
+  mcp-server:
+    build:
+      context: .
+      target: mcp-server
+    environment:
+      DATABASE_URL: *url-banco
+      DUMMYJSON_BASE_URL: ${DUMMYJSON_BASE_URL:-https://dummyjson.com}
+      DUMMYJSON_TIMEOUT_MS: ${DUMMYJSON_TIMEOUT_MS:-5000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+      start_period: 5s
+
+  # Sobe mesmo sem OPENROUTER_API_KEY: cada pedido responde que falta a chave.
+  backend:
+    build:
+      context: .
+      target: backend
+    environment:
+      DATABASE_URL: *url-banco
+      MCP_URL: http://mcp-server:3001/mcp
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      LLM_MODELO: ${LLM_MODELO:-anthropic/claude-haiku-5.5}
+      LLM_MODELO_RESERVA: ${LLM_MODELO_RESERVA-deepseek/deepseek-v4.1-flash}
+      LLM_TIMEOUT_MS: ${LLM_TIMEOUT_MS:-60000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      mcp-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+      start_period: 5s
+
+  chat:
+    build:
+      context: .
+      target: chat
+    ports:
+      - "${PORTA:-8080}:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  testes:
+    build:
+      context: .
+      target: testes
+    profiles: ["testes"]
+    environment:
+      TEST_DATABASE_URL: postgres://postgres:postgres@postgres-teste:5432/compras_teste
+    depends_on:
+      postgres-teste:
+        condition: service_healthy
+
+  # Banco descartável dos testes, em memória: nunca toca os dados do ambiente.
+  postgres-teste:
+    image: postgres:17-alpine
+    profiles: ["testes"]
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: compras_teste
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d compras_teste"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  dados:

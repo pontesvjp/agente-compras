@@ -1,0 +1,17 @@
+# Segredo e enunciado nunca entram no contexto do build (a chave da OpenRouter mora nos dois).
+.env
+.env.*
+!.env.example
+case/
+
+# Gerado ou instalado dentro da imagem
+**/node_modules
+**/dist
+**/coverage
+**/*.tsbuildinfo
+
+# Não é usado pelas imagens
+.git
+.github
+docs/
+*.log
