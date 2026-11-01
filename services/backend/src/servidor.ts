@@ -30,7 +30,9 @@ export async function criarServidor(
     requestIdHeader: 'x-request-id',
     requestIdLogLabel: 'request_id',
     genReqId: () => randomUUID(),
-    trustProxy: true,
+    // Só o nginx (o salto 0) é proxy confiável: com `true`, o IP do limite de pedidos viria do
+    // primeiro X-Forwarded-For, que o cliente escreve como quiser e assim escaparia do limite.
+    trustProxy: (_endereco, salto) => salto === 0,
     bodyLimit: 64 * 1024,
   });
 

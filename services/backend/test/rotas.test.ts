@@ -324,6 +324,21 @@ describe('GET /requisicoes', () => {
   });
 });
 
+describe('limite de pedidos', () => {
+  it('X-Forwarded-For forjado não escapa do limite: vale o IP que o nginx anotou por último', async () => {
+    const app = await subir(llmRoteirizado([]).modelo);
+
+    const status: number[] = [];
+    for (let i = 0; i < 61; i++) {
+      const forjado = { 'x-forwarded-for': `10.0.0.${i}, 203.0.113.7` };
+      status.push((await pedir(app, {}, forjado)).statusCode);
+    }
+
+    expect(status.slice(0, 60).every((s) => s === 400)).toBe(true);
+    expect(status[60]).toBe(429);
+  });
+});
+
 describe('política pela API', () => {
   it('PUT na regra da categoria vale no pedido seguinte, sem reiniciar nada', async () => {
     const app = await subir(
