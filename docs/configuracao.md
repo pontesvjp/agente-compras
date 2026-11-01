@@ -14,6 +14,9 @@ Infraestrutura e segredo ficam no `.env` (modelo em `.env.example`):
 | `PORTA` | `8080` | Porta do chat, publicada só em 127.0.0.1 (outras máquinas da rede não alcançam) |
 | `LLM_TIMEOUT_MS` | `60000` | Tempo máximo de um atendimento, somando todas as voltas do laço |
 | `POLITICA_TOKEN` | vazio | Token para alterar a política pela API (16+ caracteres). Vazio: a política só muda pelo banco |
+| `LOG_LEVEL` | `info` | Nível do log JSON do backend e do servidor MCP (`debug` mostra mais) |
+| `AVALIAR_RODADAS` | `1` | Quantas vezes a avaliação repete cada pedido |
 
-`DATABASE_URL`, `TEST_DATABASE_URL`, `MCP_URL`, `BACKEND_PORTA` e `MCP_PORTA` o compose preenche. Fora do Docker, os testes usam o Postgres
+`DATABASE_URL`, `TEST_DATABASE_URL` e `MCP_URL` o compose preenche. `BACKEND_PORTA` (3000) e `MCP_PORTA` (3001)
+ficam no padrão do código, dentro da rede do Docker. Fora do Docker, os testes usam o Postgres
 que `npm run db:teste` sobe na porta 5433.

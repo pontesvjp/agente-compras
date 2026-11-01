@@ -1,6 +1,9 @@
 # enunciado do case (traz a chave da OpenRouter)
 case/
 
+# regras locais do assistente de código
+CLAUDE.md
+
 .env
 node_modules/
 dist/

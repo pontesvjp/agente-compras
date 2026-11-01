@@ -8,7 +8,7 @@ Pelo nginx, todas as rotas ficam sob `/api` (http://localhost:8080/api). `POST /
 | Rota | Faz |
 |---|---|
 | `POST /api/requisicoes` | Roda o agente: `201` criada, `200` não atendida, `503` serviço fora. Aceita `Idempotency-Key` |
-| `GET /api/requisicoes` | Lista as requisições com os itens |
+| `GET /api/requisicoes` | Lista as requisições com os itens, da mais nova para a mais antiga. Paginada: `limite` (padrão 20, máximo 100) e `cursor`; responde `{ requisicoes, proximo_cursor }` |
 | `GET /api/requisicoes/{id}` | Uma requisição |
 | `GET /api/atendimentos/{id}` | Trilha do atendimento: ferramentas, argumentos, tempos, tokens e custo |
 | `GET /api/metricas` | Volume, taxa de atendidas, falhas, tempo p50/p95 e custo médio |

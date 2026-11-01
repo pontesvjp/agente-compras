@@ -14,7 +14,7 @@ Preço, total e estoque vêm sempre da fonte, nunca do texto do modelo.
 
 Case técnico do processo seletivo de **AI Forward Deployed Engineer** do Mercado Eletrônico
 
-[Rodar](#rodar-em-3-passos) · [Como funciona](#como-funciona) · [Decisões](#decisões) · [Testes](#testes-e-avaliação) · [Como usei IA](#como-usei-ia)
+[Rodar](#rodar-em-3-passos) · [Como funciona](#como-funciona) · [Decisões](#decisões) · [Testes](#testes-e-avaliação)
 
 </div>
 
@@ -120,7 +120,7 @@ trigger ([política](docs/politica.md)).
 (`services/backend/src/agente/laco.ts`), com o SDK oficial do MCP por Streamable HTTP.
 
 **5. Erro tem código, não só texto.** O chat explica cada falha (catálogo fora, chave inválida, MCP fora)
-sem depender do modelo ([falhas](docs/falhas.md)).
+sem depender do modelo.
 
 **6. Instrumentado.** Cada atendimento grava ferramentas, argumentos, tempos, tokens e custo
 (`GET /api/atendimentos/{id}`), e `/api/metricas` resume.
@@ -132,16 +132,14 @@ OpenRouter e por variável de ambiente.
 servidor MCP recusa `Origin` de fora do localhost. O que está protegido e o que ficou de fora:
 [segurança](docs/seguranca.md).
 
-Todas as escolhas, com o que ficou de fora: [decisões](docs/decisoes.md).
-
 ## Testes e avaliação
 
 ```bash
 docker compose run --rm --build testes                    # lint, tipos e testes, sem chave de LLM e sem internet
-docker compose run --rm --build testes npm run avaliar    # 6 pedidos de personas, conferidos no banco
+docker compose run --rm --build testes npm run avaliar    # 6 pedidos conferidos no banco (ambiente no ar e chave no .env)
 ```
 
-Avaliação real de 01/11/2026 com o Haiku 5.5 ([detalhes](docs/avaliacao.md)):
+Avaliação real de 01/11/2026 com o Haiku 5.5, uma rodada dos 6 pedidos:
 
 | Acertos | Tempo p50 | Tempo p95 | Custo por pedido |
 |:---:|:---:|:---:|:---:|
@@ -151,15 +149,8 @@ O CI roda lint, tipos, testes com Postgres e o build das imagens a cada push.
 
 ## Como usei IA
 
-O case libera IA desde que o README diga como. Usei o **Claude Code** (Anthropic), no terminal, como
-par de programação:
-
-- **Antes do código:** li com ele o enunciado e os dados reais da DummyJSON, e montamos o [`PLAN.md`](PLAN.md): etapas, decisões e um registro datado de cada mudança de rumo.
-- **Desenho:** as telas foram desenhadas antes do código, no padrão visual do ME ([o desenho](docs/imagens/desenho-antes-do-codigo.png) e o [print real](docs/imagens/chat-pedido-exemplo.png)).
-- **Código e testes:** gerados pela IA seguindo as regras do [`CLAUDE.md`](CLAUDE.md), o arquivo que ela lê em toda sessão, e revisados por mim antes de cada commit.
-- **Teste como gente:** além dos testes automáticos, testei à mão e pus um subagente no papel de uma compradora inventada. Eles acharam erros que nenhum teste cobria.
-
-Os erros que a IA cometeu e como foram pegos estão em [docs/uso-de-ia.md](docs/uso-de-ia.md).
+Usei o **Claude Code** (Anthropic) como par de programação no planejamento, no código e nos testes,
+com revisão minha antes de cada commit.
 
 ## Se algo der errado
 
@@ -185,6 +176,6 @@ Variáveis e padrões: [configuração](docs/configuracao.md).
 
 <div align="center">
 
-**Mais detalhes:** [arquitetura](docs/arquitetura.md) · [API](docs/api.md) · [política](docs/politica.md) · [falhas](docs/falhas.md) · [segurança](docs/seguranca.md) · [configuração](docs/configuracao.md) · [decisões](docs/decisoes.md) · [avaliação](docs/avaliacao.md) · [uso de IA](docs/uso-de-ia.md)
+**Mais detalhes:** [arquitetura](docs/arquitetura.md) · [API](docs/api.md) · [política](docs/politica.md) · [segurança](docs/seguranca.md) · [configuração](docs/configuracao.md)
 
 </div>

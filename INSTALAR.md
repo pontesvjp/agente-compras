@@ -51,7 +51,8 @@ Repita até os quatro serviços (`postgres`, `mcp-server`, `backend`, `chat`) ap
 curl -s http://localhost:8080/api/health
 ```
 
-Esperado: `"status":"ok"`. Se vier `"llm":"sem_chave"`, a chave não foi lida: confira o passo 2 e
+No PowerShell do Windows, use `curl.exe` no lugar de `curl`. Se trocou a `PORTA`, use a porta que
+escolheu. Esperado: `"status":"ok"`. Se vier `"llm":"sem_chave"`, a chave não foi lida: confira o passo 2 e
 rode `docker compose up -d` de novo.
 
 ## 5. Pedido de exemplo

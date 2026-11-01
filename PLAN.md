@@ -1,16 +1,15 @@
 # Plano · agente de compras
 
-> Plano por etapas que montei com o Claude Code em 30/10/2026, antes da primeira linha de código.
-> Fica no repositório para mostrar como trabalho com IA: contexto primeiro, dado real antes do prompt,
-> decisões explícitas com o motivo e etapas pequenas, cada uma virando commit.
+> Plano por etapas montado em 30/10/2026, antes da primeira linha de código: contexto primeiro, dado
+> real antes do prompt, decisões explícitas com o motivo e etapas pequenas, cada uma virando commit.
 > Entrega: `.zip` com `.git` até **terça 03/11/2026, de manhã**. Meta: enviar na **segunda 02/11 à noite**.
 
 ## Como este plano foi feito
 
-1. Passei à IA o enunciado do case, o anúncio da vaga e uma pesquisa pública sobre o Mercado Eletrônico (site, blog e portal do desenvolvedor).
-2. Pedi um plano por etapas que validasse desempenho, qualidade de código e escolha de linguagem, com extras além do pedido.
-3. Antes de decidir, a IA consultou as APIs de verdade: a DummyJSON (busca, categorias, estoque, pedido mínimo, 404 e `?delay=`) e a lista de modelos da OpenRouter (suporte a ferramentas e preço). As armadilhas da seção 2 saíram dessas consultas, não de suposição.
-4. Eu reviso e decido. Toda mudança de rumo entra na seção 10, com data e motivo.
+1. Li o enunciado do case, o anúncio da vaga e uma pesquisa pública sobre o Mercado Eletrônico (site, blog e portal do desenvolvedor).
+2. Montei um plano por etapas que validasse desempenho, qualidade de código e escolha de linguagem, com extras além do pedido.
+3. Antes de decidir, consultei as APIs de verdade: a DummyJSON (busca, categorias, estoque, pedido mínimo, 404 e `?delay=`) e a lista de modelos da OpenRouter (suporte a ferramentas e preço). As armadilhas da seção 2 saíram dessas consultas, não de suposição.
+4. Toda mudança de rumo entra na seção 10, com data e motivo.
 
 ---
 
@@ -61,8 +60,8 @@ Consultado em 30/10/2026:
 | **Zod** em toda fronteira | Valida corpo HTTP, argumento de ferramenta, argumento que o LLM manda e resposta da DummyJSON. Os schemas das ferramentas MCP saem dele |
 | **Fastify** no backend | Rápido, com validação e log JSON (pino) nativos |
 | **SDK `@modelcontextprotocol/sdk`**, transporte **Streamable HTTP** | O MCP roda em container separado, e stdio não atravessa container. O servidor fica stateless |
-| **OpenRouter pela API compatível com OpenAI**, com `fetch` e sem framework de agente | O laço de tool calling tem ~80 linhas e fica explicável linha a linha. Um framework esconderia justamente o que o case quer avaliar |
-| **Modelo padrão `anthropic/claude-haiku-5.5`** (US$ 0,10/M de entrada, 0,50/M de saída, com tool calling); fallback `deepseek/deepseek-v4.1-flash` pelo parâmetro `models` da OpenRouter | Barato, rápido e bom em ferramenta. O fallback cobre a queda de um provedor. Os dois ficam em variável de ambiente e o script de avaliação compara os dois, como já faço no trabalho atual com Claude e DeepSeek |
+| **OpenRouter pela API compatível com OpenAI**, com `fetch` e sem framework de agente | O laço de tool calling (`rodarLaco`) tem cerca de 30 linhas, num `laco.ts` de cerca de 145, e fica explicável linha a linha. Um framework esconderia justamente o que o case quer avaliar |
+| **Modelo padrão `anthropic/claude-haiku-5.5`** (US$ 0,10/M de entrada, 0,50/M de saída, com tool calling); fallback `deepseek/deepseek-v4.1-flash` pelo parâmetro `models` da OpenRouter | Barato, rápido e bom em ferramenta. O fallback cobre a queda de um provedor. Os dois ficam em variável de ambiente. O script de avaliação mostra o resultado por modelo; comparar é trocar o `LLM_MODELO` e avaliar de novo, como já faço no trabalho atual com Claude e DeepSeek. O de reserva ainda não foi avaliado |
 | **Postgres 17**, migrations SQL versionadas, rodadas pelo mcp-server no boot (tabela `schema_migrations`) | "Tabelas criadas automaticamente" mesmo com volume já existente. O `docker-entrypoint-initdb.d` só roda com volume vazio |
 | **React + Vite**, servido por **nginx**, que também faz proxy de `/api` e `/mcp` | Uma porta só (`http://localhost:8080`), sem CORS e sem URL de backend embutida no build |
 | **Vitest** nos testes, **Biome** de lint e formatação | Um binário só para lint e formatação, rápido no CI |
@@ -81,9 +80,10 @@ README e commits em português.
 apps/chat (React)  ──/api──►  services/backend (Fastify)  ──MCP/HTTP──►  services/mcp-server  ──►  DummyJSON
    nginx :8080                   │  laço do agente                           │  buscar_produtos
                                  │  OpenRouter (LLM)                         │  detalhar_produto
-                                 │  GET /requisicoes, trilha                 │  criar_requisicao ──┐
-                                 ▼                                           ▼                     │
-                              Postgres ◄──────────────────────────────────────────────────────────┘
+                                 │  GET /requisicoes, trilha                 │  criar_requisicao ────┐
+                                 │                                           │  consultar_politica ──┤
+                                 ▼                                           ▼                       │
+                              Postgres ◄─────────────────────────────────────────────────────────────┘
 packages/shared: schemas zod, tipos e regras puras · packages/db: conexão, migrador e consultas
 ```
 
@@ -93,34 +93,37 @@ packages/shared: schemas zod, tipos e regras puras · packages/db: conexão, mig
 agente-compras/
 ├── apps/chat/                            React + Vite; o nginx serve o build e repassa /api, /requisicoes e /mcp
 │   ├── index.html · nginx.conf · vite.config.ts
-│   └── src/
-│       ├── main.tsx · App.tsx · tokens.css (Eletro DS) · estilos.css
-│       ├── api.ts                        chamadas ao backend, validadas com os schemas do packages/shared
-│       ├── passos.ts                     mapa ferramenta → frase de quem compra, com os números do resultado
-│       ├── formato.ts · turnos.ts        dinheiro e hora em pt-BR; estado de cada pedido da sessão
-│       └── componentes/
-│           ├── Conversa.tsx · RespostaAgente.tsx
-│           ├── CartaoRequisicao.tsx      montado com os dados do banco, nunca com o texto do modelo
-│           ├── FerramentasChamadas.tsx   passos em português, ou o painel de "Detalhes técnicos"
-│           ├── AlertaErro.tsx            título pelo código do erro, não pelo texto do modelo
-│           └── ListaRequisicoes.tsx · Resumo.tsx · Cabecalho.tsx · Icone.tsx
+│   ├── src/
+│   │   ├── main.tsx · App.tsx · tokens.css (Eletro DS) · estilos.css
+│   │   ├── api.ts                        chamadas ao backend, validadas com os schemas do packages/shared
+│   │   ├── passos.ts                     mapa ferramenta → frase de quem compra, com os números do resultado
+│   │   ├── formato.ts · turnos.ts        dinheiro e hora em pt-BR; estado de cada pedido da sessão
+│   │   └── componentes/
+│   │       ├── Conversa.tsx · RespostaAgente.tsx · RotuloAgente.tsx
+│   │       ├── CartaoRequisicao.tsx      montado com os dados do banco, nunca com o texto do modelo
+│   │       ├── FerramentasChamadas.tsx   passos em português, ou o painel de "Detalhes técnicos"
+│   │       ├── AlertaErro.tsx            título pelo código do erro, não pelo texto do modelo
+│   │       └── ListaRequisicoes.tsx · Resumo.tsx · Cabecalho.tsx · Icone.tsx
 │   └── test/passos.test.ts
 ├── services/
 │   ├── mcp-server/
 │   │   ├── src/
-│   │   │   ├── index.ts                  sobe o HTTP e o /health
-│   │   │   ├── servidor.ts               McpServer + Streamable HTTP em /mcp, stateless
-│   │   │   ├── config.ts · erros.ts      variáveis validadas com zod; códigos de erro
+│   │   │   ├── index.ts                  roda as migrations (esperando o Postgres) e sobe o servidor
+│   │   │   ├── http.ts                   /health, Streamable HTTP em /mcp (stateless) e checagem de Origin
+│   │   │   ├── servidor.ts               McpServer: só registra as quatro ferramentas
+│   │   │   ├── config.ts · logger.ts     variáveis validadas com zod; log JSON (pino)
 │   │   │   ├── dummyjson/
 │   │   │   │   ├── cliente.ts            fetch com timeout, retry e cache
-│   │   │   │   └── esquemas.ts           zod da resposta da DummyJSON
+│   │   │   │   ├── esquemas.ts           zod da resposta da DummyJSON
+│   │   │   │   └── mapear.ts             produto da DummyJSON → campos que o modelo vê
 │   │   │   └── ferramentas/
 │   │   │       ├── buscar-produtos.ts
 │   │   │       ├── detalhar-produto.ts
 │   │   │       ├── criar-requisicao.ts
-│   │   │       └── consultar-politica.ts
+│   │   │       ├── consultar-politica.ts
+│   │   │       └── resultado.ts          saída estruturada ou erro com codigo, igual nas quatro
 │   │   └── test/
-│   │       ├── fixtures/                 respostas reais da DummyJSON gravadas em 30/10 (teste sem internet)
+│   │       ├── fixtures/                 respostas reais da DummyJSON gravadas em 01/11 (teste sem internet)
 │   │       ├── dummyjson.test.ts         timeout, 5xx, 404 e retry
 │   │       ├── <ferramenta>.test.ts      um por ferramenta, as quatro
 │   │       └── contrato.test.ts          cliente MCP de verdade por InMemoryTransport
@@ -128,6 +131,7 @@ agente-compras/
 │       ├── src/
 │       │   ├── index.ts · servidor.ts    Fastify, rate limit, request_id, erro → HTTP num lugar só
 │       │   ├── config.ts · erros.ts      variáveis validadas; código de erro → HTTP num lugar só
+│       │   ├── autorizacao.ts            token das rotas que alteram a política (POLITICA_TOKEN)
 │       │   ├── apresentacao.ts           banco (centavos) → API (dólar), num lugar só
 │       │   ├── mcp/cliente.ts            uma sessão MCP por atendimento, com os headers de rastreio
 │       │   ├── agente/
@@ -135,28 +139,31 @@ agente-compras/
 │       │   │   ├── laco.ts               laço de tool calling: quem decide é o modelo
 │       │   │   ├── tipos.ts              contrato do LLM e do executor de ferramentas (o teste troca os dois)
 │       │   │   ├── openrouter.ts         chamada, retry com Retry-After, modelo de reserva
-│       │   │   └── prompt.md
+│       │   │   └── prompt.md · prompt.ts o prompt de sistema e a leitura dele no boot
 │       │   └── rotas/                    requisicoes.ts · atendimentos.ts · metricas.ts · politica.ts · health.ts
 │       └── test/                         laco.test.ts (LLM falso) · openrouter.test.ts · rotas.test.ts
 ├── packages/
-│   ├── shared/src/                       esquemas.ts · dinheiro.ts (centavos) · politica.ts (regras puras) · api.ts (contrato HTTP)
+│   ├── shared/
+│   │   ├── src/                          esquemas.ts · dinheiro.ts (centavos) · politica.ts (regras puras) · api.ts (contrato HTTP) · erros.ts (códigos de erro)
+│   │   └── test/                         dinheiro e política, sem banco
 │   └── db/
 │       ├── migrations/                   001_requisicoes · 002_atendimentos · 003_politica_compra (carga + trigger)
-│       └── src/                          pool.ts · migrar.ts · requisicoes.ts · politica.ts · atendimentos.ts
+│       ├── src/                          pool.ts · migrar.ts · requisicoes.ts · politica.ts · atendimentos.ts
+│       └── test/                         migrations, carga inicial e trigger, com Postgres de verdade
 ├── avaliacao/personas.json               personas e resultado esperado
-├── scripts/avaliar.ts                    roda as personas e confere no banco
-├── docs/                                 arquitetura · api · politica · falhas · avaliacao · configuracao · decisoes · seguranca · uso-de-ia (.md), imagens/ e mockup/
+├── scripts/avaliar.ts                    roda as personas e confere no banco (avaliar.test.ts testa a conferência)
+├── docs/                                 arquitetura · api · configuracao · politica · seguranca (.md) e imagens/
 ├── .github/workflows/ci.yml              Biome, typecheck, testes com Postgres e build das imagens
 ├── Dockerfile                            um só, multi-stage, com os targets mcp-server, backend, chat e testes
-├── docker-compose.yml                    postgres, mcp-server, backend e chat; testes só com `run`
+├── docker-compose.yml                    postgres, mcp-server, backend e chat; testes e postgres-teste no perfil testes, só com `run`
 ├── .dockerignore                         fora do build: .env, case/, node_modules, .git
 ├── package.json · package-lock.json      workspaces e scripts: lint, typecheck, test, avaliar
-├── tsconfig.base.json · tsconfig.json    strict, com project references
+├── tsconfig.base.json · tsconfig.json    strict, com project references (tsconfig.test.json confere os tipos dos testes)
 ├── biome.json · vitest.config.ts
 ├── .env.example · .gitignore · .gitattributes
-├── README.md · CLAUDE.md · PLAN.md
+├── README.md · PLAN.md
 ├── INSTALAR.md                           prompt para o agente de IA de quem quiser instalar e rodar o projeto
-├── AGENTS.md                             aponta o INSTALAR.md para Codex, Cursor e Copilot (o CLAUDE.md abre com o mesmo aviso)
+├── AGENTS.md                             aponta o INSTALAR.md para Codex, Cursor e Copilot
 └── case/                                 enunciado, fora do git
 ```
 
@@ -169,22 +176,23 @@ agente-compras/
 | **`.dockerignore` desde o primeiro Dockerfile** | Sem ele, o `.env` com a chave e o `case/` com o PDF entram no contexto do build e podem parar dentro de uma camada da imagem |
 | **Regras de política como funções puras em `packages/shared/politica.ts`** | São testadas sem banco. O `criar_requisicao` só busca a política, aplica e grava |
 | **Teste por pasta `test/` em cada serviço, com fixtures reais da DummyJSON** | Determinístico e sem internet. O nome do arquivo mostra que cada ferramenta tem o seu teste, como o case exige |
-| **Compose com exatamente as quatro peças rodando** (`postgres`, `mcp-server`, `backend`, `chat`) | É o que o case pede. O serviço `testes` só sobe com `docker compose run` |
+| **Compose com exatamente as quatro peças rodando** (`postgres`, `mcp-server`, `backend`, `chat`) | É o que o case pede. O serviço `testes` e o banco dele (`postgres-teste`, em memória) ficam no perfil `testes` e só sobem com `docker compose run` |
 
 ### Ferramentas do MCP
 
 | Ferramenta | Entrada | Saída (estruturada) | Regras |
 |---|---|---|---|
-| `buscar_produtos` | `termo` (inglês, singular), `limite?` | lista enxuta: `id, titulo, preco, estoque, pedido_minimo, disponibilidade, categoria, marca` | Usa `select=` da DummyJSON e devolve só os campos úteis, o que corta tokens. Vazio volta com `dica`. Cache de 60 s |
+| `buscar_produtos` | `termo` (inglês, singular), `limite?` | lista enxuta: `id, titulo, preco_usd, estoque, pedido_minimo, disponibilidade, categoria, marca, avaliacao` | Usa `select=` da DummyJSON e devolve só os campos úteis, o que corta tokens. Vazio volta com `dica`. Cache de 60 s |
 | `detalhar_produto` | `id` | produto completo: garantia, prazo de envio, avaliação | 404 vira erro `PRODUTO_NAO_ENCONTRADO` |
-| `criar_requisicao` (diferencial) | `itens: [{produto_id, quantidade, preco_maximo_unitario?}]`, `solicitante?`, `justificativa` | número da requisição, itens, total, status | **Não recebe preço.** Busca cada produto na DummyJSON, confere estoque, pedido mínimo e teto de preço, calcula o total em centavos, aplica a política de compras e grava numa transação. Se algo viola, recusa com o motivo, e o modelo tem de dizer o que falta |
+| `criar_requisicao` (diferencial) | `itens: [{produto_id, quantidade, preco_maximo_unitario_usd?}]`, `solicitante?`, `justificativa` | número da requisição, itens, total, status | **Não recebe preço.** Busca cada produto na DummyJSON, confere estoque, pedido mínimo e teto de preço, calcula o total em centavos, aplica a política de compras e grava numa transação. Se algo viola, recusa com o motivo, e o modelo tem de dizer o que falta |
 | `consultar_politica` (diferencial) | `categoria?` | regras que valem: categoria permitida ou bloqueada, teto unitário, quantidade máxima, alçada, critério de escolha | Só leitura. Serve para o modelo escolher dentro da regra e explicar a recusa. Quem garante a regra continua sendo o `criar_requisicao` |
 
 - Todas declaram `outputSchema` e devolvem `structuredContent`. As de leitura levam `readOnlyHint: true`.
 - A descrição de cada ferramenta segue um padrão fixo: o que faz, **quando chamar**, **quando não chamar** (e qual usar no lugar) e **o que ela não devolve** (ex.: "não devolve preço"). É o que mais pesa em "ferramentas bem definidas".
 - Busca vazia volta com uma `dica` ("tente no singular", "notebook -> laptop"), e a descrição da ferramenta já avisa que a busca só acha em inglês e no singular.
 - Erro de ferramenta volta como `isError: true` com `codigo`: `CATALOGO_INDISPONIVEL`, `CATALOGO_LENTO`,
-  `PRODUTO_NAO_ENCONTRADO`, `REGRA_VIOLADA`. O backend usa o código para a mensagem do chat; não depende do texto do modelo.
+  `PRODUTO_NAO_ENCONTRADO`, `REGRA_VIOLADA`, `PEDIDO_INVALIDO`. O backend usa o código para a mensagem do chat; não depende do texto do modelo.
+  Todos os códigos ficam em `packages/shared/src/erros.ts`. Os do backend incluem `SEM_PERMISSAO` (403), para quem tenta alterar a política sem o token.
 - Chamada à DummyJSON com `AbortSignal.timeout(5000)` e um retry com espera em 5xx ou timeout (só GET, que é idempotente).
 
 ### Backend (pelo nginx, as rotas ficam sob `/api`)
@@ -196,25 +204,27 @@ agente-compras/
 | `GET /requisicoes/:id` | Uma requisição |
 | `GET /atendimentos/:id` | Trilha de auditoria: ferramentas chamadas, argumentos, tempo de cada uma, tokens, custo, modelo |
 | `GET /metricas` | Volume, % atendidas, % não atendidas, % erro, tempo p50/p95, custo médio |
-| `GET /politica` · `PUT /politica` · `PUT /politica/categorias/:categoria` | Lê e altera a política de compras. Vale no pedido seguinte, sem reiniciar nada |
+| `GET /politica` · `PUT /politica` · `PUT /politica/categorias/:categoria` | Lê e altera a política de compras. Vale no pedido seguinte, sem reiniciar nada. Ler é aberto; alterar exige `Authorization: Bearer <POLITICA_TOKEN>`. Com o `POLITICA_TOKEN` vazio, ninguém altera. Sem o token certo, `403 SEM_PERMISSAO` |
 | `GET /health` | Banco, MCP e LLM (`sem_chave` se faltar a chave) |
 
 ### Banco
 
 ```
-requisicoes        (id, numero 'REQ-000123', solicitante, pedido_original, status, valor_total numeric(12,2),
-                    moeda 'USD', atendimento_id, criado_em)
-requisicao_itens   (id, requisicao_id fk, produto_id, titulo, preco_unitario, quantidade, subtotal)
-atendimentos       (id, pedido, resultado, modelo, tokens_entrada, tokens_saida, custo_usd,
-                    duracao_ms, chamadas jsonb, erro, idempotency_key unique, criado_em)
+requisicoes        (id, numero 'REQ-000123', solicitante, justificativa, status, valor_total numeric(12,2),
+                    moeda 'USD', regras_aplicadas jsonb, atendimento_id, criado_em)
+requisicao_itens   (id, requisicao_id fk, produto_id, titulo, categoria, preco_unitario, quantidade, subtotal)
+atendimentos       (id, pedido, solicitante, resultado, mensagem, modelo, tokens_entrada, tokens_saida,
+                    custo_usd, duracao_ms, chamadas jsonb, erro_codigo, idempotency_key unique, criado_em)
 politica_compra    (id = 1, criterio_escolha 'menor_preco' | 'melhor_avaliacao', alcada_usd,
                     valor_maximo_requisicao_usd, atualizado_em)
-regras_categoria   (categoria pk, permitida, teto_unitario_usd, quantidade_maxima, alcada_usd, motivo)
-politica_historico (id, tabela, chave, antes jsonb, depois jsonb, alterado_em)   -- preenchida por trigger
+regras_categoria   (categoria pk, permitida, teto_unitario_usd, quantidade_maxima, alcada_usd, motivo,
+                    atualizado_em)
+politica_historico (id, tabela, chave, operacao, antes jsonb, depois jsonb, alterado_em)   -- preenchida por trigger
 ```
 
 `status` usa os nomes da requisição no ME: nasce `aprovada` até a alçada e `em_aprovacao` acima da
-alçada da categoria, se houver, senão da geral (padrão 5.000). A decisão humana (`reprovada`) fica para
+alçada da categoria, se houver, senão da geral (padrão 5.000). O texto do pedido fica em
+`atendimentos.pedido`; a requisição guarda a `justificativa` que o modelo escreveu. A decisão humana (`reprovada`) fica para
 produção: aqui o selo mostra a regra que mandou para aprovação. Preço e título são copiados para o item no momento da compra, porque o catálogo
 pode mudar depois. A requisição guarda em `regras_aplicadas jsonb` as regras que valiam na hora: a
 auditoria responde "por que esta foi para aprovação" mesmo depois de a política mudar.
@@ -234,15 +244,18 @@ auditoria responde "por que esta foi para aprovação" mesmo depois de a políti
 
 ## 5. Etapas (cada etapa = um ou mais commits)
 
+Os dias de cada etapa são o previsto em 30/10. Na prática, as etapas 1 a 7 foram feitas no domingo 01/11
+(ver o registro na seção 10).
+
 Os commits seguem o padrão `tipo: o que mudou`, em português (`feat:`, `test:`, `fix:`, `docs:`, `ci:`).
 O histórico vai junto na entrega, então os commits são pequenos e na ordem em que o projeto nasce.
 
 ### Etapa 0 · Ambiente (sex 30/10)
 1. Instalar o **Docker Desktop** (a máquina de desenvolvimento ainda não tem) e conferir `docker compose version`.
-2. Conferir o Node 22 (local está 20.20.2; nos containers vai `node:22-alpine`).
+2. Conferir o Node 22 (local está na v24, que também atende o `>=22.19.0` do `package.json`; nos containers vai `node:22-alpine`).
 3. `git init`, `.gitattributes` com `* text=auto eol=lf` (**crítico no Windows**: script com CRLF quebra dentro do container Linux), `.gitignore`, `.env.example`.
-- Feito em 30/10/2026: repo no GitHub, com `README.md` (desenho do projeto e checklist "Estado"), `CLAUDE.md`, este plano, `.gitignore`, `.gitattributes` e `.env.example`. O enunciado (`case/`) fica fora do git porque traz a chave da OpenRouter.
-- Falta: Docker Desktop e o esqueleto do monorepo (`package.json` com workspaces, `tsconfig`, Biome), que entra no commit `chore: esqueleto do monorepo`.
+- Feito em 30/10/2026: repo no GitHub, com `README.md` (desenho do projeto e checklist "Estado"), este plano, `.gitignore`, `.gitattributes` e `.env.example`. O enunciado (`case/`) fica fora do git porque traz a chave da OpenRouter.
+- Feito em 01/11/2026: Docker instalado (com WSL2) e o esqueleto do monorepo (`package.json` com workspaces, `tsconfig`, Biome), no commit `chore: esqueleto do monorepo`.
 
 ### Etapa 1 · Servidor MCP e testes (sex à noite / sáb de manhã)
 1. `packages/shared`: schemas zod de produto, item e requisição.
@@ -251,17 +264,17 @@ O histórico vai junto na entrega, então os commits são pequenos e na ordem em
 4. Testes, **sem chave de LLM**:
    - unidade de cada ferramenta com a DummyJSON simulada (`undici` MockAgent): sucesso, vazio, 404, 5xx, timeout;
    - contrato: um cliente MCP real conectado ao servidor em memória (`InMemoryTransport`) lista as ferramentas e chama cada uma.
-- Commits: `feat: cliente da DummyJSON com timeout e retry` → `feat: servidor MCP com buscar_produtos e detalhar_produto` → `test: testes das ferramentas do MCP sem LLM`
+- Commits: `feat: servidor MCP com buscar_produtos e detalhar_produto` (já com o cliente da DummyJSON) → `test: testes das ferramentas do MCP sem LLM`
 
 ### Etapa 2 · Banco e `criar_requisicao` (sáb)
 1. Migrations SQL em `packages/db/migrations` (`001_requisicoes.sql`, `002_atendimentos.sql`, `003_politica_compra.sql` com a carga inicial e o trigger de histórico) e o migrador com `pg_advisory_lock`, chamado no boot do mcp-server.
 2. `criar_requisicao` com as travas (preço da fonte, estoque, mínimo, teto) e a política lida da tabela a cada chamada (categoria bloqueada, teto e quantidade da categoria, valor máximo, alçada), numa transação. Grava `regras_aplicadas`.
 3. `consultar_politica` (só leitura).
 4. Testes com Postgres de verdade (container no CI e o do compose local), incluindo a recusa de cada regra e a mudança de regra valendo no pedido seguinte. **Um teste por ferramenta do MCP, sem chave de LLM, vale para todas**, não só as duas do enunciado: `criar_requisicao` e `consultar_politica` entram aqui.
-- Commits: `feat: migrations do Postgres` → `feat: criar_requisicao com validação de preço, estoque e pedido mínimo` → `feat: política de compras em tabela, com histórico por trigger`
+- Commits: `feat: política de compras como regra pura, com dinheiro em centavos` → `feat: pacote db com migrations, política em tabela e histórico por trigger` → `feat: criar_requisicao e consultar_politica no servidor MCP` → `fix: atualizado_em da política e carga inicial no histórico`
 
 ### Etapa 3 · Backend e agente (sáb à tarde / dom)
-1. Cliente MCP no backend (lista as ferramentas no boot e reconecta se o MCP cair).
+1. Cliente MCP no backend: abre uma sessão por atendimento, lista as ferramentas e fecha no fim. O MCP é stateless, então não há conexão longa para cair e reconectar.
 2. Laço do agente: manda o pedido e as ferramentas → executa o que o modelo pedir (em paralelo, se ele pedir várias) → devolve o resultado → repete até a resposta final ou o limite de voltas.
 3. Prompt de sistema em `services/backend/src/agente/prompt.md` (versionado e legível):
    - busque em inglês e no singular;
@@ -298,7 +311,7 @@ O histórico vai junto na entrega, então os commits são pequenos e na ordem em
    - `depends_on: condition: service_healthy`;
    - volume do Postgres;
    - só a porta do chat exposta (`${PORTA:-8080}`), com o nginx repassando `/api` e `/mcp`, e também `/requisicoes` direto, para quem testar a rota exatamente como está no enunciado (`POST /requisicoes`, `GET /requisicoes`);
-   - serviço `testes` (target de teste do Dockerfile, com as dependências de desenvolvimento) para `docker compose run --rm testes` e `npm run avaliar`;
+   - serviço `testes` (target de teste do Dockerfile, com as dependências de desenvolvimento) para `docker compose run --rm --build testes` e `npm run avaliar`;
    - chave lida do `.env`. O backend sobe mesmo sem chave e responde de forma clara, porque os testes rodam sem chave.
 3. Imagens públicas multi-arquitetura (funciona também em Mac com Apple Silicon).
 - Commit: `feat: docker compose com as quatro peças e healthchecks`
@@ -314,22 +327,20 @@ O histórico vai junto na entrega, então os commits são pequenos e na ordem em
    | 4 | "2 cadeiras para a sala de reunião, até US$ 600" | Não atendida por pedido mínimo (a única cadeira exige 5) |
    | 5 | "10 monitores para o time de desenvolvimento" | Não atendida. A busca traz panela e relógio, e o agente não pode escolher |
    | 6 | "Preciso de uma moto para as entregas" | Não atendida pela política: `motorcycle` bloqueada, com o motivo |
-   | extra | Qualquer pedido com `DUMMYJSON_BASE_URL` apontando para um endereço morto | `503` e mensagem clara no chat |
+   | extra | Catálogo fora do ar | `503` com `CATALOGO_INDISPONIVEL` e mensagem clara no chat. Fica fora do script de avaliação: é coberto por teste (`services/backend/test/rotas.test.ts`) |
 
    Antes de fechar, reconferir os dados na DummyJSON, porque ela pode mudar.
 2. GitHub Actions: Biome, typecheck, testes (com serviço Postgres) e `docker compose build`. O workflow roda a cada push e vai junto no zip.
 3. Selo "Em aprovação" no chat, com a regra que levou a requisição para a alçada.
-- Commits: `feat: script de avaliação com 6 pedidos` → `ci: lint, typecheck, testes e build` → `feat: selo de alçada no chat`
+- Commits: `feat: script de avaliação com 6 pedidos conferidos no banco` → `ci: lint, typecheck, testes e build das imagens`. O selo de alçada entrou junto com o chat, em `feat: chat em React com cartão da requisição e ferramentas chamadas`.
 
 ### Etapa 7 · README, decisões e ensaio (seg 02/11)
-1. **README enxuto:** o case pede que ele explique "em poucas linhas" como rodar e as principais decisões. A primeira tela fica com rodar, o exemplo e as decisões, em até umas 100 linhas. Arquitetura, rotas, política, falhas e avaliação vão para `docs/`, com link. Comandos conferidos, exemplos trocados por saída real e a seção "Estado" retirada.
-2. `docs/decisoes.md`: uma linha de contexto, decisão e alternativa descartada para cada escolha da seção 3.
-3. GIF curto do pedido de exemplo no README, gravado do app real.
-   - O mockup feito antes do código (canvas privado) **não vai como link**. Vai exportado em PNG para `docs/desenho-antes-do-codigo.png`, só com as telas que foram construídas, ao lado do print real, e citado em `docs/uso-de-ia.md`.
-   - Tela do mockup que não foi construída (modo consultivo e aba Regras, cortados em 01/11) fica fora da imagem e sai de `docs/mockup` antes da entrega. Não mostrar promessa que o app não cumpre.
-4. Seção **"Como usei IA"** honesta (exigência do case), com os casos reais de correção registrados em `docs/uso-de-ia.md`.
+1. **README enxuto:** o case pede que ele explique "em poucas linhas" como rodar e as principais decisões. Ficou com menos de 200 linhas, com o pedido de exemplo e o "como rodar" no topo. Arquitetura, rotas, configuração, política e segurança vão para `docs/`, com link. Comandos conferidos, exemplos trocados por saída real e a seção "Estado" retirada.
+2. As principais decisões ficam no próprio README, na seção "Decisões".
+3. Print do pedido de exemplo no README (`docs/imagens/chat-pedido-exemplo.png`), tirado do app real.
+4. Seção **"Como usei IA"** honesta (exigência do case).
 5. "Plugar no Claude Code": o nginx também repassa `/mcp` ao servidor MCP, e `claude mcp add --transport http compras http://localhost:8080/mcp` funciona. Mostra que o servidor MCP é reutilizável fora deste backend.
-6. **Ensaio de máquina limpa:** `git clone` para uma pasta temporária, `docker compose down -v`, `docker compose up --build`, pedido de exemplo e `docker compose run --rm testes`. Se falhar aqui, falharia na máquina de quem avalia (35%).
+6. **Ensaio de máquina limpa:** `git clone` para uma pasta temporária, `docker compose down -v`, `docker compose up --build`, pedido de exemplo e `docker compose run --rm --build testes`. Se falhar aqui, falharia na máquina de quem avalia (35%).
 7. Zipar o clone limpo do passo 6, que já vem com `.git` e sem `.env`, `node_modules` e `case/`. Conferir que a chave não aparece no histórico (`git log -p --all | grep -E "sk-or-v1-[0-9a-f]{20}"`).
 
 ---
@@ -338,7 +349,7 @@ O histórico vai junto na entrega, então os commits são pequenos e na ordem em
 
 | O quê | Meta | Como medir |
 |---|---|---|
-| `POST /requisicoes` (pedido de exemplo) | p50 < 8 s, p95 < 15 s | `scripts/avaliar.ts` (5 rodadas por pedido) |
+| `POST /requisicoes` (pedido de exemplo) | p50 < 8 s, p95 < 15 s | `scripts/avaliar.ts` (`AVALIAR_RODADAS`, padrão 1). A avaliação real teve 1 rodada: 6 tempos, e o p95 é o mais lento |
 | Ferramenta MCP com cache quente | < 10 ms | log `duracao_ms` por chamada |
 | Ferramenta MCP com a DummyJSON | p95 < 1,5 s; corta em 5 s | log e teste com `?delay=` |
 | Tokens por atendimento | < 6 mil de entrada | `atendimentos.tokens_entrada` (a busca enxuta é o que segura isso) |
@@ -369,15 +380,16 @@ O histórico vai junto na entrega, então os commits são pequenos e na ordem em
 | 2 | Política de compras em tabela (alçada, teto e quantidade por categoria, categoria bloqueada), com histórico por trigger e `consultar_politica` no MCP | "Alçada por valor e tipo de compra" e "política de categorias" do blog do ME. Cada cliente tem a sua política, e o FDE configura sem deploy | médio |
 | 3 | Descrição das ferramentas no padrão quando chamar / quando não chamar / o que não devolve, e `dica` na busca vazia | "Ferramentas bem definidas" é critério de 25% | baixo |
 | 5 | Trilha de auditoria + `/metricas` | É o "instrumentará… volume, taxa de acerto, tempo, falhas" do anúncio, e a "trilha de auditoria" do blog do ME | médio |
-| 6 | Script de avaliação com conferência no banco, comparando 2 modelos | Prova de valor com número, e decisão de modelo baseada em dado | baixo |
+| 6 | Script de avaliação com conferência no banco e resultado por modelo (trocar o modelo é manual; o de reserva não foi avaliado) | Prova de valor com número, e decisão de modelo baseada em dado | baixo |
 | 7 | Ferramentas chamadas no chat | Diferencial do case, e prova visual de que o modelo decide | baixo |
 | 9 | Idempotency-Key + rate limit + retry com `Retry-After` | Os três itens de "integração B2B" do requisito da vaga | baixo |
 | 10 | CI | Diferencial do case | baixo |
 | 11 | MCP plugável no Claude Code | Liga com o "MCP OData Connect" do ME e com o diferencial "MCP, Claude Code" da vaga | quase zero (só README) |
 
-**Cortados em 01/11** (viram uma linha cada em "Para produção, eu faria"): aprovar e reprovar com motivo,
-alçada por solicitante, sinônimos em tabela, trava do texto, aba "Regras", modo consultivo, data de
-necessidade e webhook de saída. A política continua editável pela API (`PUT /politica`).
+**Cortados em 01/11:** aprovar e reprovar com motivo, alçada por solicitante, sinônimos em tabela, trava
+do texto, aba "Regras", modo consultivo, data de necessidade e webhook de saída. Desses, o README cita em
+"Para produção, eu faria" só aprovar e reprovar, alçada por solicitante e webhook. A política continua
+editável pela API (`PUT /politica`, com o `POLITICA_TOKEN`).
 
 **Fora de propósito:** autenticação de usuário, multi-tenant e fila de mensagens. Ficam no README,
 na seção "Para produção, eu faria", com uma linha cada, sem gastar o prazo.
@@ -389,7 +401,7 @@ na seção "Para produção, eu faria", com uma linha cada, sem gastar o prazo.
 - **A chave da OpenRouter expira por volta de 06/11.** O README explica como trocar por outra em `OPENROUTER_API_KEY`.
 - `case/` e `.env` ficam fora do git (já no `.gitignore`).
 - Se o tempo apertar, a ordem de corte é a do fim para o começo da seção 8. O núcleo (etapas 1 a 5 e o README) não se corta.
-- **Linha de corte:** aplicada em 01/11 à tarde, antes do prazo de 18h: o código só começou no domingo e o Docker ainda precisou ser instalado. A segunda-feira fica para o chat, o compose, a avaliação, o README e o ensaio em clone limpo.
+- **Linha de corte:** aplicada em 01/11 à tarde, antes do prazo de 18h: o código só começou no domingo e o Docker ainda precisou ser instalado. No fim, o chat, o compose, a avaliação, o README e o ensaio em clone limpo também saíram no domingo 01/11.
 - **Extra não pode mudar o pedido de exemplo.** Quem avalia vai repetir "3 laptops até US$ 2.000" várias vezes. Nenhuma regra nova (política, alçada, trava) pode fazer a segunda rodada se comportar diferente da primeira sem um motivo claro na resposta.
 
 ---
@@ -399,8 +411,8 @@ na seção "Para produção, eu faria", com uma linha cada, sem gastar o prazo.
 | Data | Mudança | Motivo |
 |---|---|---|
 | 30/10/2026 | Plano criado, antes de qualquer código | Fechar o desenho antes de gastar o prazo em código |
-| 30/10/2026 | README e `CLAUDE.md` escritos antes do código | O README vira a especificação, com o checklist "Estado" atualizado a cada etapa; o `CLAUDE.md` fixa as regras para toda sessão com a IA |
-| 30/10/2026 | O plano passou a ser versionado (antes ficava só na máquina) | Mostrar na entrega como o trabalho com IA foi conduzido |
+| 30/10/2026 | README escrito antes do código | O README vira a especificação, com o checklist "Estado" atualizado a cada etapa |
+| 30/10/2026 | O plano passou a ser versionado (antes ficava só na máquina) | Mostrar na entrega o planejamento e as decisões |
 | 30/10/2026 | Política de compras em tabela no mesmo Postgres; `ALCADA_USD` saiu do `.env`; entrou `consultar_politica` no MCP e o pedido 6 na avaliação | Regra de negócio é do cliente e muda sem deploy; o blog do ME fala em alçada por valor e tipo de compra. Descartado um segundo banco: mais um container é mais risco de não subir |
 | 30/10/2026 | Entraram sinônimos em tabela, padrão de descrição das ferramentas, trava do texto e o modo consultivo (`sugerir_para_necessidade` + confirmação), que substitui o item "pergunta de esclarecimento" | Ideias trazidas de um agente de vendas que já pus em produção: busca tolerante a como o cliente escreve, valor só de ferramenta conferido em código, e o cliente que descreve o sintoma sem saber o produto. O modo consultivo fica depois do núcleo para não arriscar o prazo |
 | 30/10/2026 | Visual do chat no padrão de produto do ME: tokens públicos do Eletro Design System (Roboto, `--me-primary-*`, `--me-gray-*`, status e sombras), sem logo nem nome | O FDE entrega dentro do ambiente do cliente; a tela já nasce no padrão visual da plataforma onde rodaria. Usei os tokens do produto (Eletro DS), não as cores do site de marketing |
@@ -412,8 +424,9 @@ na seção "Para produção, eu faria", com uma linha cada, sem gastar o prazo.
 | 01/11/2026 | Status da requisição renomeados: `aberta` virou `aprovada` e `aguardando_aprovacao` virou `em_aprovacao`, com `reprovada` para a decisão negativa | São os nomes que o padrão de Requisição do guia de design do ME usa (Rascunho, Em aprovação, Aprovado, Reprovado). O mockup foi ajustado no mesmo dia ao Eletro DS e ao padrão do chat de IA deles |
 | 01/11/2026 | Backend: uma sessão MCP por atendimento em vez de conexão longa com reconexão; códigos de erro `NAO_ENCONTRADO`, `MUITOS_PEDIDOS` e `ERRO_INTERNO`; requisição já gravada vale mesmo se o modelo falhar depois; Idempotency-Key espera o pedido em andamento | O MCP é stateless: abrir por atendimento leva os headers `x-atendimento-id` e `x-request-id` e elimina o caso de conexão caída. Os códigos novos cobrem 404, 429 e 500 com o mesmo formato `{codigo, mensagem}`. Responder erro depois de gravar faria a pessoa pedir de novo e duplicar a compra; o duplo clique chega enquanto o primeiro pedido ainda roda |
 | 01/11/2026 | A trilha do atendimento passa a guardar o resultado estruturado de cada ferramenta | O chat descreve cada passo com os números que a ferramenta devolveu ("5 resultados, de US$ 1.099,99 a US$ 1.999,99"), sem depender do texto do modelo, e a auditoria em `GET /atendimentos/:id` mostra o que o modelo viu em cada chamada |
-| 01/11/2026 | Entrou o `INSTALAR.md`: um prompt para o agente de IA de quem recebe o case instalar, subir e testar o projeto | Pedido do autor para o e-mail de entrega ("abra no seu agente e peça: siga o INSTALAR.md"). Só instalação e teste, sem alterar código, com a chave pedida à pessoa e nunca mostrada. O `CLAUDE.md` e um `AGENTS.md` abrem com o aviso, para o agente achar o arquivo sozinho |
+| 01/11/2026 | Entrou o `INSTALAR.md`: um prompt para o agente de IA de quem recebe o case instalar, subir e testar o projeto | Pedido do autor para o e-mail de entrega ("abra no seu agente e peça: siga o INSTALAR.md"). Só instalação e teste, sem alterar código, com a chave pedida à pessoa e nunca mostrada. O `AGENTS.md` abre com o aviso, para o agente achar o arquivo sozinho |
 | 01/11/2026 | Imagens do backend e do MCP ficaram com cerca de 205 MB de conteúdo, um pouco acima da meta de 200 MB | O binário do Node na `node:22-alpine` sozinho tem 124 MB; as dependências do projeto somam 53 MB. Trocar a imagem base não compensa o risco perto da entrega |
 | 01/11/2026 | Avaliação real: 6 de 6 com o Haiku 5.5, p50 7,7 s, p95 12,9 s e US$ 0,0015 por pedido, mas 12 mil tokens de entrada (meta de 6 mil). O modelo de reserva não foi avaliado | Os tokens vêm de 3 a 4 voltas por pedido, cada uma reenviando o prompt e o schema das 4 ferramentas. Cortar isso (descrições menores, `limite` menor na busca) mexe no prompt e pede nova avaliação; fica para depois da entrega |
 | 01/11/2026 | Ensaio em clone limpo do GitHub, seguindo o `INSTALAR.md`: do zero aos quatro serviços saudáveis em 56 s, chat e rotas funcionando, testes passando, nenhuma chave no histórico. Os comandos de teste passam a usar `--build` | O serviço `testes` está num perfil e o `docker compose run` reaproveitava uma imagem antiga: o ensaio rodou 91 testes em vez de 92 até a correção |
 | 01/11/2026 | Revisão de segurança antes da entrega: chat só em `127.0.0.1`, `PUT /politica` com `POLITICA_TOKEN`, `X-Forwarded-For` e `x-atendimento-id` vindos de fora descartados no nginx, `Origin` checado no `/mcp`, cabeçalhos de segurança (CSP) no nginx e CI só com leitura | O ambiente de quem avalia roda com a chave da OpenRouter no `.env`. Nada disso muda o `docker compose up` nem o pedido de exemplo; o que ficou de fora está em `docs/seguranca.md` |
+| 01/11/2026 | Depois da revisão de segurança: novo ensaio em clone limpo (quatro serviços saudáveis em 54 s, 95 testes passando) e conferência dos documentos contra o código, que corrigiu nomes de campo, rotas com token, árvore de pastas e comandos | O plano tinha ficado para trás do código |

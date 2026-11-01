@@ -4,7 +4,7 @@
 
 O alvo é o ambiente de quem avalia: um `docker compose up` numa máquina pessoal, com a chave da
 OpenRouter no `.env`. A revisão de 01/11/2026 usou a skill `sharp-edges`, da Trail of Bits, que
-procura onde o caminho mais fácil acaba inseguro. Cada correção virou um commit `fix:`.
+procura onde o caminho mais fácil acaba inseguro. Cada correção virou um commit próprio.
 
 ## O que está protegido
 
@@ -19,6 +19,7 @@ procura onde o caminho mais fácil acaba inseguro. Cada correção virou um comm
 | SQL injection | Toda consulta usa parâmetro (`$1`); nome de coluna vem de lista fixa |
 | XSS no chat | O React escapa o texto do modelo e não há `innerHTML`. O nginx manda CSP, `nosniff` e `frame-ancestors 'none'` |
 | Chave da OpenRouter no git ou na imagem | `.env` no `.gitignore` e no `.dockerignore`; `git log -p --all` sem nenhuma chave |
+| CI com permissão de escrita no repositório | O token do GitHub Actions só lê (`permissions: contents: read`) |
 | Dependência com falha conhecida | `npm audit` sem nenhuma em 01/11/2026 |
 
 ## O que ficou de fora, e por quê

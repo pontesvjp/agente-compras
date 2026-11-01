@@ -18,6 +18,7 @@ Ler a política é aberto. Para alterar, ponha um token de 16 caracteres ou mais
 `.env` (ex.: a saída de `openssl rand -hex 32`), rode `docker compose up -d` e mande o token no cabeçalho:
 
 ```bash
+POLITICA_TOKEN=cole-aqui-o-mesmo-valor-do-.env
 curl -s -X PUT http://localhost:8080/api/politica/categorias/laptops \
   -H "authorization: Bearer $POLITICA_TOKEN" \
   -H "content-type: application/json" \
