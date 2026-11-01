@@ -145,7 +145,7 @@ agente-compras/
 │       └── src/                          pool.ts · migrar.ts · requisicoes.ts · politica.ts · atendimentos.ts
 ├── avaliacao/personas.json               personas e resultado esperado
 ├── scripts/avaliar.ts                    roda as personas e confere no banco
-├── docs/                                 arquitetura.md · decisoes.md · avaliacao.md · uso-de-ia.md
+├── docs/                                 arquitetura · api · politica · falhas · avaliacao · configuracao · decisoes · seguranca · uso-de-ia (.md), imagens/ e mockup/
 ├── .github/workflows/ci.yml              Biome, typecheck, testes com Postgres e build das imagens
 ├── Dockerfile                            um só, multi-stage, com os targets mcp-server, backend, chat e testes
 ├── docker-compose.yml                    postgres, mcp-server, backend e chat; testes só com `run`
@@ -241,7 +241,7 @@ O histórico vai junto na entrega, então os commits são pequenos e na ordem em
 1. Instalar o **Docker Desktop** (a máquina de desenvolvimento ainda não tem) e conferir `docker compose version`.
 2. Conferir o Node 22 (local está 20.20.2; nos containers vai `node:22-alpine`).
 3. `git init`, `.gitattributes` com `* text=auto eol=lf` (**crítico no Windows**: script com CRLF quebra dentro do container Linux), `.gitignore`, `.env.example`.
-- Feito em 30/10/2026: repo no GitHub (público desde a criação, conferido em 01/11), com `README.md` (desenho do projeto e checklist "Estado"), `CLAUDE.md`, este plano, `.gitignore`, `.gitattributes` e `.env.example`. O enunciado (`case/`) fica fora do git porque traz a chave da OpenRouter.
+- Feito em 30/10/2026: repo no GitHub, com `README.md` (desenho do projeto e checklist "Estado"), `CLAUDE.md`, este plano, `.gitignore`, `.gitattributes` e `.env.example`. O enunciado (`case/`) fica fora do git porque traz a chave da OpenRouter.
 - Falta: Docker Desktop e o esqueleto do monorepo (`package.json` com workspaces, `tsconfig`, Biome), que entra no commit `chore: esqueleto do monorepo`.
 
 ### Etapa 1 · Servidor MCP e testes (sex à noite / sáb de manhã)
@@ -416,4 +416,4 @@ na seção "Para produção, eu faria", com uma linha cada, sem gastar o prazo.
 | 01/11/2026 | Imagens do backend e do MCP ficaram com cerca de 205 MB de conteúdo, um pouco acima da meta de 200 MB | O binário do Node na `node:22-alpine` sozinho tem 124 MB; as dependências do projeto somam 53 MB. Trocar a imagem base não compensa o risco perto da entrega |
 | 01/11/2026 | Avaliação real: 6 de 6 com o Haiku 5.5, p50 7,7 s, p95 12,9 s e US$ 0,0015 por pedido, mas 12 mil tokens de entrada (meta de 6 mil). O modelo de reserva não foi avaliado | Os tokens vêm de 3 a 4 voltas por pedido, cada uma reenviando o prompt e o schema das 4 ferramentas. Cortar isso (descrições menores, `limite` menor na busca) mexe no prompt e pede nova avaliação; fica para depois da entrega |
 | 01/11/2026 | Ensaio em clone limpo do GitHub, seguindo o `INSTALAR.md`: do zero aos quatro serviços saudáveis em 56 s, chat e rotas funcionando, testes passando, nenhuma chave no histórico. Os comandos de teste passam a usar `--build` | O serviço `testes` está num perfil e o `docker compose run` reaproveitava uma imagem antiga: o ensaio rodou 91 testes em vez de 92 até a correção |
-| 01/11/2026 | Correção: o repositório é público desde a criação (30/10), e não privado como o plano e o `CLAUDE.md` diziam | Conferido nos eventos do GitHub antes da entrega. O histórico nunca teve a chave da OpenRouter, que fica no `.env` e em `case/`, fora do git |
+| 01/11/2026 | Revisão de segurança antes da entrega: chat só em `127.0.0.1`, `PUT /politica` com `POLITICA_TOKEN`, `X-Forwarded-For` e `x-atendimento-id` vindos de fora descartados no nginx, `Origin` checado no `/mcp`, cabeçalhos de segurança (CSP) no nginx e CI só com leitura | O ambiente de quem avalia roda com a chave da OpenRouter no `.env`. Nada disso muda o `docker compose up` nem o pedido de exemplo; o que ficou de fora está em `docs/seguranca.md` |
