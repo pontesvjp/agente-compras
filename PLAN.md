@@ -63,7 +63,7 @@ Consultado em 30/10/2026:
 | **SDK `@modelcontextprotocol/sdk`**, transporte **Streamable HTTP** | O MCP roda em container separado, e stdio não atravessa container. O servidor fica stateless |
 | **OpenRouter pela API compatível com OpenAI**, com `fetch` e sem framework de agente | O laço de tool calling tem ~80 linhas e fica explicável linha a linha. Um framework esconderia justamente o que o case quer avaliar |
 | **Modelo padrão `anthropic/claude-haiku-5.5`** (US$ 0,10/M de entrada, 0,50/M de saída, com tool calling); fallback `deepseek/deepseek-v4.1-flash` pelo parâmetro `models` da OpenRouter | Barato, rápido e bom em ferramenta. O fallback cobre a queda de um provedor. Os dois ficam em variável de ambiente e o script de avaliação compara os dois, como já faço no trabalho atual com Claude e DeepSeek |
-| **Postgres 17**, migrations SQL versionadas, rodadas pelo backend no boot (tabela `schema_migrations`) | "Tabelas criadas automaticamente" mesmo com volume já existente. O `docker-entrypoint-initdb.d` só roda com volume vazio |
+| **Postgres 17**, migrations SQL versionadas, rodadas pelo mcp-server no boot (tabela `schema_migrations`) | "Tabelas criadas automaticamente" mesmo com volume já existente. O `docker-entrypoint-initdb.d` só roda com volume vazio |
 | **React + Vite**, servido por **nginx**, que também faz proxy de `/api` e `/mcp` | Uma porta só (`http://localhost:8080`), sem CORS e sem URL de backend embutida no build |
 | **Vitest** nos testes, **Biome** de lint e formatação | Um binário só para lint e formatação, rápido no CI |
 | `temperature: 0` e no máximo 8 voltas no laço | Resposta estável, e a rodada não fica presa em loop |
@@ -81,7 +81,7 @@ README e commits em português.
 apps/chat (React)  ──/api──►  services/backend (Fastify)  ──MCP/HTTP──►  services/mcp-server  ──►  DummyJSON
    nginx :8080                   │  laço do agente                           │  buscar_produtos
                                  │  OpenRouter (LLM)                         │  detalhar_produto
-                                 │  migrations, GET /requisicoes             │  criar_requisicao ──┐
+                                 │  GET /requisicoes, trilha                 │  criar_requisicao ──┐
                                  ▼                                           ▼                     │
                               Postgres ◄──────────────────────────────────────────────────────────┘
 packages/shared: schemas zod, tipos e regras puras · packages/db: conexão, migrador e consultas
@@ -118,21 +118,24 @@ agente-compras/
 │   │   └── test/
 │   │       ├── fixtures/                 respostas reais da DummyJSON gravadas em 30/10 (teste sem internet)
 │   │       ├── dummyjson.test.ts         timeout, 5xx, 404 e retry
-│   │       ├── <ferramenta>.test.ts      um por ferramenta, as cinco
+│   │       ├── <ferramenta>.test.ts      um por ferramenta, as quatro
 │   │       └── contrato.test.ts          cliente MCP de verdade por InMemoryTransport
 │   └── backend/
 │       ├── src/
 │       │   ├── index.ts · servidor.ts    Fastify, rate limit, request_id, erro → HTTP num lugar só
-│       │   ├── config.ts · erros.ts
-│       │   ├── mcp/cliente.ts            lista as ferramentas e reconecta
+│       │   ├── config.ts · erros.ts      variáveis validadas; código de erro → HTTP num lugar só
+│       │   ├── apresentacao.ts           banco (centavos) → API (dólar), num lugar só
+│       │   ├── mcp/cliente.ts            uma sessão MCP por atendimento, com os headers de rastreio
 │       │   ├── agente/
+│       │   │   ├── atender.ts            atendimento de ponta a ponta: trilha, Idempotency-Key, laço, resposta
 │       │   │   ├── laco.ts               laço de tool calling: quem decide é o modelo
+│       │   │   ├── tipos.ts              contrato do LLM e do executor de ferramentas (o teste troca os dois)
 │       │   │   ├── openrouter.ts         chamada, retry com Retry-After, modelo de reserva
 │       │   │   └── prompt.md
 │       │   └── rotas/                    requisicoes.ts · atendimentos.ts · metricas.ts · politica.ts · health.ts
-│       └── test/                         laco.test.ts (LLM falso) · rotas.test.ts
+│       └── test/                         laco.test.ts (LLM falso) · openrouter.test.ts · rotas.test.ts
 ├── packages/
-│   ├── shared/src/                       esquemas.ts · dinheiro.ts (centavos) · politica.ts (regras puras)
+│   ├── shared/src/                       esquemas.ts · dinheiro.ts (centavos) · politica.ts (regras puras) · api.ts (contrato HTTP)
 │   └── db/
 │       ├── migrations/                   001_requisicoes · 002_atendimentos · 003_politica_compra (carga + trigger)
 │       └── src/                          pool.ts · migrar.ts · requisicoes.ts · politica.ts · atendimentos.ts
@@ -402,3 +405,4 @@ na seção "Para produção, eu faria", com uma linha cada, sem gastar o prazo.
 | 30/10/2026 | Entraram aprovar/reprovar com motivo, alçada por solicitante com validade e, se sobrar tempo, a data de necessidade comparada ao prazo de envio | Vindo do processo de compras do ERP onde trabalho: pedido reprovado fica com motivo e usuário, e o limite de alçada é por pessoa, com data de fim e motivo |
 | 01/11/2026 | Corte de escopo: saíram aprovar/reprovar, alçada por solicitante, sinônimos, trava do texto, aba "Regras", modo consultivo (`sugerir_para_necessidade`), data de necessidade e webhook. O migrador roda só no boot do mcp-server | No domingo à tarde ainda não havia código, e o Docker precisou ser instalado (com WSL2). O case avalia mais integração e "funciona" do que sofisticação. O visual com os tokens do Eletro ficou, porque é só CSS e o mockup já está nele |
 | 01/11/2026 | Status da requisição renomeados: `aberta` virou `aprovada` e `aguardando_aprovacao` virou `em_aprovacao`, com `reprovada` para a decisão negativa | São os nomes que o padrão de Requisição do guia de design do ME usa (Rascunho, Em aprovação, Aprovado, Reprovado). O mockup foi ajustado no mesmo dia ao Eletro DS e ao padrão do chat de IA deles |
+| 01/11/2026 | Backend: uma sessão MCP por atendimento em vez de conexão longa com reconexão; códigos de erro `NAO_ENCONTRADO`, `MUITOS_PEDIDOS` e `ERRO_INTERNO`; requisição já gravada vale mesmo se o modelo falhar depois; Idempotency-Key espera o pedido em andamento | O MCP é stateless: abrir por atendimento leva os headers `x-atendimento-id` e `x-request-id` e elimina o caso de conexão caída. Os códigos novos cobrem 404, 429 e 500 com o mesmo formato `{codigo, mensagem}`. Responder erro depois de gravar faria a pessoa pedir de novo e duplicar a compra; o duplo clique chega enquanto o primeiro pedido ainda roda |

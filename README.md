@@ -126,11 +126,12 @@ agente de um bot de roteiro.
 | Nada do catálogo atende | O que faltou: preço mais baixo encontrado, pedido mínimo, estoque | `200`, `nao_atendida` |
 | Pedido fora da política (categoria bloqueada, acima do teto ou da quantidade máxima) | A regra que barrou e o motivo cadastrado | `200`, `nao_atendida` |
 | Total acima da alçada | A requisição é criada com o selo "Em aprovação" e a regra que a levou para lá | `201`, `em_aprovacao` |
-| DummyJSON fora ou lenta (5 s, com uma nova tentativa) | "O catálogo de produtos não respondeu. Tente de novo em instantes." | `503`, `CATALOGO_INDISPONIVEL` |
+| DummyJSON fora ou lenta (5 s, com uma nova tentativa) | "O catálogo de produtos não respondeu. Tente de novo em instantes." | `503`, `CATALOGO_INDISPONIVEL` ou `CATALOGO_LENTO` |
 | Chave da OpenRouter inválida ou vencida | "A chave do modelo de IA é inválida ou venceu. Troque `OPENROUTER_API_KEY` no `.env`." | `503`, `LLM_CHAVE_INVALIDA` |
 | OpenRouter com limite de taxa ou fora | Nova tentativa respeitando `Retry-After`, depois o modelo de reserva; se nada responder, mensagem clara | `503`, `LLM_INDISPONIVEL` |
 | Servidor MCP fora | "O serviço de catálogo está fora do ar." | `503`, `MCP_INDISPONIVEL` |
 | Pedido vazio ou longo demais | Aviso na própria tela | `400`, `PEDIDO_INVALIDO` |
+| Mais de 60 pedidos por minuto do mesmo IP | "Muitos pedidos em sequência. Espere um minuto e tente de novo." | `429`, `MUITOS_PEDIDOS` |
 | Mesmo pedido reenviado (duplo clique, retry) | A mesma requisição, sem duplicar | `200`, via `Idempotency-Key` |
 
 ## Testes
@@ -200,8 +201,9 @@ Infraestrutura e segredo ficam no `.env` (modelo em `.env.example`):
 | `DUMMYJSON_BASE_URL` | `https://dummyjson.com` | Aponte para um endereço morto para ver o tratamento de falha |
 | `DUMMYJSON_TIMEOUT_MS` | `5000` | Tempo máximo de cada chamada ao catálogo |
 | `PORTA` | `8080` | Porta do chat na sua máquina |
+| `LLM_TIMEOUT_MS` | `60000` | Tempo máximo de um atendimento, somando todas as voltas do laço |
 
-`DATABASE_URL` e `TEST_DATABASE_URL` o compose preenche. Fora do Docker, os testes usam o Postgres
+`DATABASE_URL`, `TEST_DATABASE_URL`, `MCP_URL`, `BACKEND_PORTA` e `MCP_PORTA` o compose preenche. Fora do Docker, os testes usam o Postgres
 que `npm run db:teste` sobe na porta 5433.
 
 ## Usar o servidor MCP no Claude Code
@@ -262,7 +264,7 @@ Os dois arquivos que mostram esse processo ficam no repositório:
 - [x] Servidor MCP com `buscar_produtos` e `detalhar_produto`, com testes
 - [x] Postgres com migrations e `criar_requisicao` com as travas
 - [x] Política de compras em tabela, com histórico e `consultar_politica`
-- [ ] Backend com o laço do agente, a trilha de atendimentos e as métricas
+- [x] Backend com o laço do agente, a trilha de atendimentos e as métricas
 - [ ] Chat em React
 - [ ] Docker Compose com as quatro peças
 - [ ] Avaliação com 6 pedidos, CI e selo de alçada
