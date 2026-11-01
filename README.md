@@ -109,16 +109,3 @@ Os erros que a IA cometeu e como foram pegos estão em [docs/uso-de-ia.md](docs/
 - **Banco do zero:** `docker compose down -v`.
 
 Variáveis e padrões: [docs/configuracao.md](docs/configuracao.md).
-
-## Estado
-
-- [x] Desenho do projeto (este README), plano por etapas (`PLAN.md`), regras do repositório (`CLAUDE.md`) e configuração base
-- [x] Esqueleto do monorepo (workspaces, TypeScript, Biome, Vitest)
-- [x] Servidor MCP com `buscar_produtos` e `detalhar_produto`, com testes
-- [x] Postgres com migrations e `criar_requisicao` com as travas
-- [x] Política de compras em tabela, com histórico e `consultar_politica`
-- [x] Backend com o laço do agente, a trilha de atendimentos e as métricas
-- [x] Chat em React
-- [x] Docker Compose com as quatro peças
-- [x] Avaliação com 6 pedidos, CI e selo de alçada
-- [ ] Ensaio em clone limpo e entrega
