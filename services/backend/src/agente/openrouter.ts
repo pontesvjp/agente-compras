@@ -109,11 +109,12 @@ export function criarModeloOpenRouter(opcoes: OpcoesOpenRouter): ModeloLlm {
     }
 
     const texto = await resposta.text();
+    // 402 é falta de crédito na conta; 403 com "limit" é o limite de gasto da chave esgotado.
+    if (resposta.status === 402 || (resposta.status === 403 && /limit/i.test(texto))) {
+      throw new ErroAgente('LLM_CHAVE_INVALIDA', SEM_CREDITO, { cause: texto.slice(0, 300) });
+    }
     if (resposta.status === 401 || resposta.status === 403) {
       throw new ErroAgente('LLM_CHAVE_INVALIDA', CHAVE_INVALIDA);
-    }
-    if (resposta.status === 402) {
-      throw new ErroAgente('LLM_CHAVE_INVALIDA', SEM_CREDITO, { cause: texto.slice(0, 300) });
     }
     if (resposta.status === 429 || resposta.status >= 500) {
       throw new Retentavel(

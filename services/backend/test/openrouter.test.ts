@@ -101,6 +101,18 @@ describe('OpenRouter', () => {
     expect(String(erro)).toContain('sem crédito');
   });
 
+  it('403 de limite da chave esgotado também é "sem crédito", não "chave inválida"', async () => {
+    agente
+      .get(BASE)
+      .intercept({ path: CAMINHO, method: 'POST' })
+      .reply(403, { error: { message: 'Key limit exceeded (total limit).', code: 403 } });
+
+    const erro = await completar().catch((e: unknown) => e);
+
+    expect(erro).toMatchObject({ codigo: 'LLM_CHAVE_INVALIDA' });
+    expect(String(erro)).toContain('sem crédito');
+  });
+
   it('5xx duas vezes vira LLM_INDISPONIVEL', async () => {
     agente.get(BASE).intercept({ path: CAMINHO, method: 'POST' }).reply(503, 'fora').times(2);
 
