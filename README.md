@@ -8,8 +8,9 @@ Case técnico do processo seletivo de **AI Forward Deployed Engineer** do Mercad
 ```text
 você    Preciso de 3 laptops para o time de vendas, até US$ 2.000 cada.
 
-agente  buscar_produtos("laptop")                              5 resultados · 380 ms
-        criar_requisicao([{ produto_id: 81, quantidade: 3 }])               210 ms
+agente  buscar_produtos("laptop")                               5 resultados · 848 ms
+        consultar_politica("laptops")                                       53 ms
+        criar_requisicao([{ produto_id: 81, quantidade: 3 }])               286 ms
 
         Requisição REQ-000001 · aprovada
         3 × Lenovo Yoga 920          US$ 1.099,99          US$ 3.299,97
@@ -44,25 +45,77 @@ curl -s http://localhost:8080/api/requisicoes \
 ```json
 {
   "resultado": "criada",
+  "atendimento_id": "8a887051-9ea6-4964-ae6e-ce382405d7e6",
   "requisicao": {
+    "id": 1,
     "numero": "REQ-000001",
     "status": "aprovada",
+    "solicitante": null,
+    "justificativa": "Preciso de 3 laptops para o time de vendas, até US$ 2.000 cada.",
     "itens": [
-      { "produto_id": 81, "titulo": "Lenovo Yoga 920", "quantidade": 3, "preco_unitario": 1099.99, "subtotal": 3299.97 }
+      {
+        "produto_id": 81,
+        "titulo": "Lenovo Yoga 920",
+        "categoria": "laptops",
+        "quantidade": 3,
+        "preco_unitario": 1099.99,
+        "subtotal": 3299.97
+      }
     ],
     "valor_total": 3299.97,
-    "moeda": "USD"
+    "moeda": "USD",
+    "alcada": {
+      "valor_usd": 5000,
+      "origem": "geral"
+    },
+    "atendimento_id": "8a887051-9ea6-4964-ae6e-ce382405d7e6",
+    "criado_em": "2026-11-01T18:56:57.690Z"
   },
-  "mensagem": "Criei a requisição REQ-000001 com 3 Lenovo Yoga 920 a US$ 1.099,99, o laptop mais barato dentro do limite.",
+  "mensagem": "Criei a requisição REQ-000001 com 3 unidades do Lenovo Yoga 920, a US$ 1.099,99 cada, com total de US$ 3.299,97. Ela está aprovada, pois o total ficou dentro da alçada. O Lenovo foi escolhido por ser o de menor preço entre os laptops que atendem ao limite de US$ 2.000 por unidade.",
   "ferramentas": [
-    { "nome": "buscar_produtos", "argumentos": { "termo": "laptop" }, "duracao_ms": 380 },
-    { "nome": "criar_requisicao", "argumentos": { "itens": [{ "produto_id": 81, "quantidade": 3 }] }, "duracao_ms": 210 }
+    {
+      "nome": "buscar_produtos",
+      "argumentos": {
+        "termo": "laptop",
+        "limite": 10
+      },
+      "duracao_ms": 848,
+      "ok": true,
+      "erro_codigo": null
+    },
+    {
+      "nome": "consultar_politica",
+      "argumentos": {
+        "categoria": "laptops"
+      },
+      "duracao_ms": 53,
+      "ok": true,
+      "erro_codigo": null
+    },
+    {
+      "nome": "criar_requisicao",
+      "argumentos": {
+        "itens": [
+          {
+            "produto_id": 81,
+            "quantidade": 3,
+            "preco_maximo_unitario_usd": 2000
+          }
+        ],
+        "justificativa": "Preciso de 3 laptops para o time de vendas, até US$ 2.000 cada."
+      },
+      "duracao_ms": 286,
+      "ok": true,
+      "erro_codigo": null
+    }
   ]
 }
 ```
 
-Se nada atende, nada é gravado e a resposta diz o que faltou. Exemplo para "5 laptops até US$ 1.000 cada":
-*"Não criei a requisição: nenhum laptop do catálogo sai por até US$ 1.000. O mais barato é o Lenovo Yoga 920, a US$ 1.099,99."*
+Resposta real de 01/11/2026, com `anthropic/claude-haiku-5.5`: 9,4 s, 11.169 tokens de entrada e US$ 0,0014.
+
+Se nada atende, nada é gravado e a resposta diz o que faltou. Exemplo real para "5 laptops até US$ 1.000 cada":
+*"Não criei a requisição: nenhum dos laptops encontrados custa até US$ 1.000. O mais barato é o Lenovo Yoga 920, a US$ 1.099,99 a unidade, com estoque de 40 e pedido mínimo de 1. Se quiser, posso seguir com esse modelo ou com outro valor máximo por unidade."*
 
 ## Como funciona
 
@@ -127,7 +180,7 @@ agente de um bot de roteiro.
 | Pedido fora da política (categoria bloqueada, acima do teto ou da quantidade máxima) | A regra que barrou e o motivo cadastrado | `200`, `nao_atendida` |
 | Total acima da alçada | A requisição é criada com o selo "Em aprovação" e a regra que a levou para lá | `201`, `em_aprovacao` |
 | DummyJSON fora ou lenta (5 s, com uma nova tentativa) | "O catálogo de produtos não respondeu. Tente de novo em instantes." | `503`, `CATALOGO_INDISPONIVEL` ou `CATALOGO_LENTO` |
-| Chave da OpenRouter inválida ou vencida | "A chave do modelo de IA é inválida ou venceu. Troque `OPENROUTER_API_KEY` no `.env`." | `503`, `LLM_CHAVE_INVALIDA` |
+| Chave da OpenRouter inválida, vencida ou sem crédito | "A chave do modelo de IA é inválida ou venceu" (ou "está sem crédito"). "Troque `OPENROUTER_API_KEY` no `.env`." | `503`, `LLM_CHAVE_INVALIDA` |
 | OpenRouter com limite de taxa ou fora | Nova tentativa respeitando `Retry-After`, depois o modelo de reserva; se nada responder, mensagem clara | `503`, `LLM_INDISPONIVEL` |
 | Servidor MCP fora | "O serviço de catálogo está fora do ar." | `503`, `MCP_INDISPONIVEL` |
 | Pedido vazio ou longo demais | Aviso na própria tela | `400`, `PEDIDO_INVALIDO` |
