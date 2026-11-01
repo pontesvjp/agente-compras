@@ -13,11 +13,18 @@ export type CodigoErro = (typeof CODIGOS_ERRO)[number];
 
 export class ErroAgente extends Error {
   readonly codigo: CodigoErro;
+  /** Dados que ajudam a explicar o erro (ex.: as regras violadas), devolvidos ao modelo. */
+  readonly detalhes: unknown;
 
-  constructor(codigo: CodigoErro, mensagem: string, options?: { cause?: unknown }) {
-    super(mensagem, options);
+  constructor(
+    codigo: CodigoErro,
+    mensagem: string,
+    options?: { cause?: unknown; detalhes?: unknown },
+  ) {
+    super(mensagem, options?.cause === undefined ? undefined : { cause: options.cause });
     this.name = 'ErroAgente';
     this.codigo = codigo;
+    this.detalhes = options?.detalhes;
   }
 }
 

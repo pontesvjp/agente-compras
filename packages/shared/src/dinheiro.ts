@@ -6,6 +6,19 @@ export function paraCentavos(valor: number): number {
   return Math.round(valor * 100);
 }
 
+/** Lê o numeric(12,2) que o Postgres devolve como texto ("2500.00") sem passar por float. */
+export function decimalParaCentavos(texto: string): number {
+  const partes = /^(\d+)(?:\.(\d{1,2}))?$/.exec(texto.trim());
+  if (!partes) throw new RangeError(`Decimal inválido: ${texto}`);
+  const [, inteiro = '0', fracao = ''] = partes;
+  return Number(inteiro) * 100 + Number(fracao.padEnd(2, '0'));
+}
+
+/** Valor em dólar para mostrar ao modelo como número: 109999 -> 1099.99. */
+export function centavosParaUsd(centavos: number): number {
+  return Number(centavosParaDecimal(centavos));
+}
+
 /** Texto decimal para gravar em numeric(12,2), sem passar por float: 109999 -> "1099.99". */
 export function centavosParaDecimal(centavos: number): string {
   if (!Number.isSafeInteger(centavos) || centavos < 0) {
