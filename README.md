@@ -201,6 +201,9 @@ Infraestrutura e segredo ficam no `.env` (modelo em `.env.example`):
 | `DUMMYJSON_TIMEOUT_MS` | `5000` | Tempo máximo de cada chamada ao catálogo |
 | `PORTA` | `8080` | Porta do chat na sua máquina |
 
+`DATABASE_URL` e `TEST_DATABASE_URL` o compose preenche. Fora do Docker, os testes usam o Postgres
+que `npm run db:teste` sobe na porta 5433.
+
 ## Usar o servidor MCP no Claude Code
 
 ```bash
