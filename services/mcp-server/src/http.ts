@@ -20,6 +20,22 @@ function cabecalho(req: IncomingMessage, nome: string): string | undefined {
   return typeof valor === 'string' && valor !== '' ? valor : undefined;
 }
 
+const HOSTS_LOCAIS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+/**
+ * Navegador sempre manda Origin; cliente MCP de terminal (backend, Claude Code) não manda. Só uma
+ * página da própria máquina pode chamar o /mcp: barra o DNS rebinding, em que um site de fora faz o
+ * navegador de quem roda o projeto falar com o localhost. A especificação do MCP exige essa checagem.
+ */
+function origemPermitida(origem: string | undefined): boolean {
+  if (origem === undefined) return true;
+  try {
+    return HOSTS_LOCAIS.has(new URL(origem).hostname);
+  } catch {
+    return false;
+  }
+}
+
 async function lerCorpoJson(req: IncomingMessage): Promise<unknown> {
   const partes: Buffer[] = [];
   let tamanho = 0;
@@ -74,6 +90,12 @@ export function criarServidorHttp(deps: Omit<DependenciasServidor, 'atendimentoI
       return;
     }
     if (caminho === '/mcp') {
+      const origem = cabecalho(req, 'origin');
+      if (!origemPermitida(origem)) {
+        logger.warn({ origem }, '/mcp recusado: Origin de fora da máquina');
+        erroJsonRpc(res, 403, -32000, 'Origin não permitido: o /mcp só aceita páginas do localhost.');
+        return;
+      }
       atenderMcp(req, res, {
         ...deps,
         logger,

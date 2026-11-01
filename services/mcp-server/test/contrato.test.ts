@@ -106,6 +106,40 @@ describe('contrato MCP', () => {
     await new Promise((fechado) => servidor.close(fechado));
   });
 
+  it('recusa Origin de fora da máquina (DNS rebinding) e aceita página do localhost', async () => {
+    const { servidor, url } = await subirHttp();
+    const inicializar = (origin: string) =>
+      fetch(new URL('/mcp', url), {
+        method: 'POST',
+        headers: {
+          origin,
+          'content-type': 'application/json',
+          accept: 'application/json, text/event-stream',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'initialize',
+          params: {
+            protocolVersion: '2025-06-18',
+            capabilities: {},
+            clientInfo: { name: 'teste', version: '1.0.0' },
+          },
+        }),
+      });
+
+    const [deFora, semHost, local] = await Promise.all([
+      inicializar('http://site-malicioso.example'),
+      inicializar('null'),
+      inicializar('http://localhost:8080'),
+    ]);
+
+    expect(deFora.status).toBe(403);
+    expect(semHost.status).toBe(403);
+    expect(local.status).toBe(200);
+    await new Promise((fechado) => servidor.close(fechado));
+  });
+
   it('responde /health para o healthcheck do compose', async () => {
     const { servidor, url } = await subirHttp();
 
