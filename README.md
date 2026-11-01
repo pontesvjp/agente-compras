@@ -17,6 +17,7 @@ Case técnico do processo seletivo de **AI Forward Deployed Engineer** do Mercad
 [Rodar](#rodar-em-3-passos) · [Como funciona](#como-funciona) · [Decisões](#decisões) · [Testes](#testes-e-avaliação) · [Como usei IA](#como-usei-ia)
 
 </div>
+
 ## O pedido de exemplo
 
 ```text
