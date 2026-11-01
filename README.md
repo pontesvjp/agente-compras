@@ -76,7 +76,7 @@ navegador ──:8080──► chat (React, servido por nginx)
                      mcp-server ─────────────────────► DummyJSON
                         │ criar_requisicao
                         ▼
-                     Postgres ◄── o backend cria as tabelas no boot e lista as requisições
+                     Postgres ◄── o mcp-server cria as tabelas no boot; o backend lista as requisições
 ```
 
 1. O chat manda o pedido para `POST /api/requisicoes`.
@@ -168,7 +168,7 @@ não no texto do modelo. Mostra acertos, tempo e custo de cada modelo.
 ## Política de compras
 
 As regras de compra ficam em tabelas do Postgres, não no código. Elas são carregadas por migration
-quando o ambiente sobe e podem ser alteradas pela aba "Regras" do chat ou pela API.
+quando o ambiente sobe e podem ser alteradas pela API.
 
 | Regra (carga inicial) | Valor |
 |---|---|
@@ -260,7 +260,7 @@ Os dois arquivos que mostram esse processo ficam no repositório:
 - [ ] Postgres com migrations e `criar_requisicao` com as travas
 - [ ] Política de compras em tabela, com histórico e `consultar_politica`
 - [ ] Backend com o laço do agente, a trilha de atendimentos e as métricas
-- [ ] Chat em React, com a aba "Regras"
+- [ ] Chat em React
 - [ ] Docker Compose com as quatro peças
 - [ ] Avaliação com 6 pedidos, CI e selo de alçada
 - [ ] Ensaio em clone limpo e entrega
