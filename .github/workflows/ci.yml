@@ -5,6 +5,10 @@ on:
   push:
   pull_request:
 
+# O CI só lê o código: o token do GitHub não precisa escrever nada.
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
