@@ -7,6 +7,9 @@ export const CODIGOS_ERRO = [
   'LLM_INDISPONIVEL',
   'MCP_INDISPONIVEL',
   'PEDIDO_INVALIDO',
+  'NAO_ENCONTRADO',
+  'MUITOS_PEDIDOS',
+  'ERRO_INTERNO',
 ] as const;
 
 export type CodigoErro = (typeof CODIGOS_ERRO)[number];

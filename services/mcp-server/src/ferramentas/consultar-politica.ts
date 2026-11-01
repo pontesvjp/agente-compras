@@ -1,5 +1,5 @@
 import { lerPolitica, type Pool } from '@agente-compras/db';
-import { centavosParaUsd, type RegraCategoria } from '@agente-compras/shared';
+import { politicaEmUsd, regraCategoriaApiSchema } from '@agente-compras/shared';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
@@ -18,20 +18,11 @@ export const entradaConsultarPolitica = {
     ),
 };
 
-const regraSaida = z.object({
-  categoria: z.string(),
-  permitida: z.boolean(),
-  teto_unitario_usd: z.number().nullable(),
-  quantidade_maxima: z.number().int().nullable(),
-  alcada_usd: z.number().nullable(),
-  motivo: z.string().nullable(),
-});
-
 export const saidaConsultarPolitica = {
   criterio_escolha: z.enum(['menor_preco', 'melhor_avaliacao']),
   alcada_geral_usd: z.number(),
   valor_maximo_requisicao_usd: z.number(),
-  categorias: z.array(regraSaida),
+  categorias: z.array(regraCategoriaApiSchema),
   observacao: z.string().optional(),
 };
 
@@ -41,36 +32,20 @@ const DESCRICAO = [
   'Quando não chamar: para validar a compra. Quem garante a regra é criar_requisicao, que confere tudo de novo ao gravar.',
 ].join(' ');
 
-const usdOuNulo = (centavos: number | null) =>
-  centavos === null ? null : centavosParaUsd(centavos);
-
-function paraSaida(regra: RegraCategoria) {
-  return {
-    categoria: regra.categoria,
-    permitida: regra.permitida,
-    teto_unitario_usd: usdOuNulo(regra.teto_unitario_centavos),
-    quantidade_maxima: regra.quantidade_maxima,
-    alcada_usd: usdOuNulo(regra.alcada_centavos),
-    motivo: regra.motivo,
-  };
-}
-
 export async function executarConsultarPolitica(
   pool: Pool,
   args: { categoria?: string | undefined },
   logger: Logger,
 ): Promise<CallToolResult> {
   try {
-    const politica = await lerPolitica(pool);
+    const politica = politicaEmUsd(await lerPolitica(pool));
     const categoria = args.categoria?.trim().toLowerCase();
-    const regras = [...politica.regras.values()].filter(
+    const regras = politica.categorias.filter(
       (regra) => categoria === undefined || regra.categoria === categoria,
     );
     return resultadoOk({
-      criterio_escolha: politica.criterio_escolha,
-      alcada_geral_usd: centavosParaUsd(politica.alcada_centavos),
-      valor_maximo_requisicao_usd: centavosParaUsd(politica.valor_maximo_requisicao_centavos),
-      categorias: regras.map(paraSaida),
+      ...politica,
+      categorias: regras,
       ...(categoria !== undefined && regras.length === 0
         ? {
             observacao: `A categoria "${categoria}" não tem regra própria: valem a alçada geral e o valor máximo por requisição.`,
