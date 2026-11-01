@@ -74,7 +74,8 @@ export function executorFalso(atrasoMs: Record<string, number> = {}): {
     async chamar(nome) {
       ordem.push(nome);
       await esperar(atrasoMs[nome] ?? 0);
-      return { ok: true, texto: JSON.stringify({ resultado_de: nome }), erro_codigo: null };
+      const estruturado = { resultado_de: nome };
+      return { ok: true, texto: JSON.stringify(estruturado), erro_codigo: null, estruturado };
     },
   };
   return { executor, ordem };

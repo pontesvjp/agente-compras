@@ -31,13 +31,17 @@ function textoDoResultado(conteudo: unknown): string {
   return lido.data.map((parte) => ('text' in parte ? parte.text : '')).join('\n');
 }
 
-function codigoDoErro(texto: string): string {
+function jsonOuNulo(texto: string): unknown {
   try {
-    const lido = erroFerramentaSchema.safeParse(JSON.parse(texto));
-    return lido.success ? lido.data.codigo : 'ERRO_INTERNO';
+    return JSON.parse(texto);
   } catch {
-    return 'ERRO_INTERNO';
+    return null;
   }
+}
+
+function codigoDoErro(estruturado: unknown): string {
+  const lido = erroFerramentaSchema.safeParse(estruturado);
+  return lido.success ? lido.data.codigo : 'ERRO_INTERNO';
 }
 
 /** O `$schema` do JSON Schema não interessa ao modelo e alguns provedores recusam. */
@@ -101,13 +105,25 @@ export async function abrirSessaoMcp(url: string, contexto: ContextoSessao): Pro
           opcoes,
         );
         const texto = textoDoResultado(resultado.content);
-        return resultado.isError === true
-          ? { ok: false, texto, erro_codigo: codigoDoErro(texto) }
-          : { ok: true, texto, erro_codigo: null };
+        if (resultado.isError === true) {
+          const estruturado = jsonOuNulo(texto);
+          return { ok: false, texto, erro_codigo: codigoDoErro(estruturado), estruturado };
+        }
+        return {
+          ok: true,
+          texto,
+          erro_codigo: null,
+          estruturado: resultado.structuredContent ?? null,
+        };
       } catch (erro) {
         if (erro instanceof McpError && erro.code === ErrorCode.InvalidParams) {
-          const texto = JSON.stringify({ codigo: 'PEDIDO_INVALIDO', mensagem: erro.message });
-          return { ok: false, texto, erro_codigo: 'PEDIDO_INVALIDO' };
+          const estruturado = { codigo: 'PEDIDO_INVALIDO', mensagem: erro.message };
+          return {
+            ok: false,
+            texto: JSON.stringify(estruturado),
+            erro_codigo: 'PEDIDO_INVALIDO',
+            estruturado,
+          };
         }
         throw new ErroAgente('MCP_INDISPONIVEL', MCP_FORA, { cause: erro });
       }

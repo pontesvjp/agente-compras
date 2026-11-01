@@ -20,6 +20,8 @@ export const chamadaFerramentaSchema = z.object({
   duracao_ms: z.number().int().nonnegative(),
   ok: z.boolean(),
   erro_codigo: z.string().nullable(),
+  /** O que a ferramenta devolveu (structuredContent, ou `{codigo, mensagem}` no erro). */
+  resultado: z.unknown().optional(),
 });
 export type ChamadaFerramenta = z.infer<typeof chamadaFerramentaSchema>;
 

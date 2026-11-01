@@ -37,6 +37,7 @@ const ROTEIRO_EXEMPLO: Passo[] = [
         argumentos: {
           itens: [{ produto_id: 81, quantidade: 3, preco_maximo_unitario_usd: 2000 }],
           justificativa: 'time de vendas',
+          solicitante: 'Financeiro',
         },
       },
     ],
@@ -109,10 +110,11 @@ const pedir = (app: FastifyInstance, corpo: object, headers: Record<string, stri
 
 describe('POST /requisicoes', () => {
   it('pedido de exemplo: o modelo busca e grava, e a resposta traz a requisição lida do banco', async () => {
-    const app = await subir(llmRoteirizado(ROTEIRO_EXEMPLO).modelo);
+    const llm = llmRoteirizado(ROTEIRO_EXEMPLO);
+    const app = await subir(llm.modelo);
     catalogoDeLaptops();
 
-    const resposta = await pedir(app, { pedido: PEDIDO_EXEMPLO });
+    const resposta = await pedir(app, { pedido: PEDIDO_EXEMPLO, solicitante: 'Time de vendas' });
     const corpo = resposta.json();
 
     expect(resposta.statusCode).toBe(201);
@@ -121,6 +123,7 @@ describe('POST /requisicoes', () => {
       mensagem: 'Criei a requisição com 3 Lenovo Yoga 920.',
       requisicao: {
         status: 'aprovada',
+        solicitante: 'Time de vendas',
         valor_total: 3299.97,
         moeda: 'USD',
         atendimento_id: corpo.atendimento_id,
@@ -132,6 +135,14 @@ describe('POST /requisicoes', () => {
       'buscar_produtos',
       'criar_requisicao',
     ]);
+    expect(corpo.ferramentas[0].resultado).toMatchObject({ termo: 'laptop', total: 5 });
+    expect(llm.recebido[0]?.[1]?.content).toContain(
+      'Solicitante informado no formulário: Time de vendas',
+    );
+    expect(corpo.ferramentas[1].resultado).toMatchObject({
+      numero: corpo.requisicao.numero,
+      valor_total_texto: 'US$ 3.299,97',
+    });
 
     const trilha = await app.inject({ url: `/atendimentos/${corpo.atendimento_id}` });
     expect(trilha.json()).toMatchObject({

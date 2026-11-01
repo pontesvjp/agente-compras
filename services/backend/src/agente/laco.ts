@@ -57,7 +57,8 @@ function lerArgumentos(texto: string): Record<string, unknown> | null {
 }
 
 function erroParaModelo(codigo: string, mensagem: string): ResultadoFerramenta {
-  return { ok: false, texto: JSON.stringify({ codigo, mensagem }), erro_codigo: codigo };
+  const estruturado = { codigo, mensagem };
+  return { ok: false, texto: JSON.stringify(estruturado), erro_codigo: codigo, estruturado };
 }
 
 async function executarChamada(
@@ -90,6 +91,7 @@ async function executarChamada(
       duracao_ms: Math.round(performance.now() - inicio),
       ok: resultado.ok,
       erro_codigo: resultado.erro_codigo,
+      resultado: resultado.estruturado,
     },
     texto: resultado.texto,
   };

@@ -41,6 +41,8 @@ export interface ResultadoFerramenta {
   /** Texto devolvido ao modelo como resultado da ferramenta. */
   texto: string;
   erro_codigo: string | null;
+  /** Resultado estruturado, guardado na trilha e usado pelo chat para descrever cada passo. */
+  estruturado: unknown;
 }
 
 /** O que o laço precisa do MCP. A sessão MCP implementa; os testes usam um executor falso. */
