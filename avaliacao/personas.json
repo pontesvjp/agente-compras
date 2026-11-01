@@ -1,0 +1,50 @@
+[
+  {
+    "id": 1,
+    "persona": "Compradora do time de vendas",
+    "solicitante": "Time de vendas",
+    "pedido": "Preciso de 3 laptops para o time de vendas, até US$ 2.000 cada.",
+    "esperado": {
+      "resultado": "criada",
+      "quantidade": 3,
+      "categoria": "laptops",
+      "preco_maximo_usd": 2000
+    }
+  },
+  {
+    "id": 2,
+    "persona": "Gerente comercial",
+    "solicitante": "Vendas externas",
+    "pedido": "4 tablets até US$ 700 para os vendedores externos",
+    "esperado": {
+      "resultado": "criada",
+      "quantidade": 4,
+      "categoria": "tablets",
+      "preco_maximo_usd": 700
+    }
+  },
+  {
+    "id": 3,
+    "persona": "Analista de compras com orçamento curto",
+    "pedido": "5 laptops até US$ 1.000 cada",
+    "esperado": { "resultado": "nao_atendida", "mensagem_cita": ["1.099,99"] }
+  },
+  {
+    "id": 4,
+    "persona": "Secretária pedindo cadeiras",
+    "pedido": "2 cadeiras para a sala de reunião, até US$ 600",
+    "esperado": { "resultado": "nao_atendida", "mensagem_cita": ["mínimo"] }
+  },
+  {
+    "id": 5,
+    "persona": "Líder de desenvolvimento",
+    "pedido": "10 monitores para o time de desenvolvimento",
+    "esperado": { "resultado": "nao_atendida" }
+  },
+  {
+    "id": 6,
+    "persona": "Coordenador de logística",
+    "pedido": "Preciso de uma moto para as entregas",
+    "esperado": { "resultado": "nao_atendida", "mensagem_cita": ["frota"] }
+  }
+]

@@ -15,6 +15,7 @@ export default defineConfig({
       'packages/*/test/**/*.test.ts',
       'services/*/test/**/*.test.ts',
       'apps/*/test/**/*.test.ts',
+      'scripts/*.test.ts',
     ],
     testTimeout: 10_000,
     // Os testes de banco recriam o schema do Postgres de teste: um arquivo por vez.

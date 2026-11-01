@@ -212,7 +212,9 @@ docker compose run --rm testes npm run avaliar
 ```
 
 Com o ambiente no ar e a chave no `.env`, manda 6 pedidos ao backend e confere o resultado **no banco**,
-não no texto do modelo. Mostra acertos, tempo e custo de cada modelo.
+não no texto do modelo. Mostra acertos, tempo e custo de cada modelo. Os pedidos ficam em
+`avaliacao/personas.json`; `AVALIAR_RODADAS=5` repete cada um para medir p50 e p95. Para comparar
+modelos, troque `LLM_MODELO` no `.env`, rode `docker compose up -d` e avalie de novo.
 
 | # | Pedido | Esperado |
 |---|---|---|

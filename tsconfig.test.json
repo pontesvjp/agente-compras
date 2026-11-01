@@ -5,5 +5,5 @@
     "declaration": false,
     "noEmit": true
   },
-  "include": ["packages/*/test", "services/*/test", "vitest.config.ts"]
+  "include": ["packages/*/test", "services/*/test", "scripts", "vitest.config.ts"]
 }

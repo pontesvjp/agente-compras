@@ -21,6 +21,8 @@ COPY tsconfig.base.json tsconfig.json tsconfig.test.json biome.json vitest.confi
 COPY packages packages
 COPY services services
 COPY apps apps
+COPY scripts scripts
+COPY avaliacao avaliacao
 
 # 3. Build: TypeScript dos pacotes e serviços, e o bundle do chat
 FROM fonte AS build

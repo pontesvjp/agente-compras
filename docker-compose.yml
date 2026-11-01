@@ -85,6 +85,8 @@ services:
     profiles: ["testes"]
     environment:
       TEST_DATABASE_URL: postgres://postgres:postgres@postgres-teste:5432/compras_teste
+      # npm run avaliar fala com o ambiente no ar pelos nomes dos serviços (backend, postgres).
+      AVALIAR_RODADAS: ${AVALIAR_RODADAS:-1}
     depends_on:
       postgres-teste:
         condition: service_healthy

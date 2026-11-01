@@ -16,7 +16,8 @@
     "lint": "biome check .",
     "format": "biome check --write .",
     "test": "vitest run",
-    "db:teste": "docker run -d --rm --name compras-pg-teste -p 5433:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=compras_teste postgres:17-alpine"
+    "db:teste": "docker run -d --rm --name compras-pg-teste -p 5433:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=compras_teste postgres:17-alpine",
+    "avaliar": "tsc -b && node scripts/avaliar.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.4",
