@@ -10,7 +10,6 @@ Preço, total e estoque vêm sempre da fonte, nunca do texto do modelo.
 ![MCP Streamable HTTP](https://img.shields.io/badge/MCP-Streamable_HTTP-111111)
 ![Postgres 17](https://img.shields.io/badge/Postgres-17-4169E1?logo=postgresql&logoColor=white)
 ![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
-![Avaliação 6 de 6](https://img.shields.io/badge/avalia%C3%A7%C3%A3o-6%2F6-2EA44F)
 
 Case técnico do processo seletivo de **AI Forward Deployed Engineer** do Mercado Eletrônico
 
@@ -107,6 +106,7 @@ no código: quem decide a próxima ferramenta é o modelo ([arquitetura](docs/ar
 | qual produto atende o pedido | total em centavos, estoque e pedido mínimo |
 | como traduzir "notebook" para a busca | teto, quantidade máxima, categoria e alçada da política |
 | como explicar o que faltou | o número que a pessoa vê, lido do banco; se nada atende, nada é gravado |
+| quando gravar a requisição | o teto em dólar escrito no pedido, mesmo se o modelo não o repassar, e uma requisição por pedido |
 
 **2. Olhei o dado antes de escrever o prompt.** A busca da DummyJSON só acha em inglês e no singular e
 traz ruído (`monitor` devolve uma panela), e 156 de 194 produtos têm pedido mínimo. O prompt e as
@@ -155,7 +155,6 @@ Programei com o **Claude Code** (Anthropic) como par, conduzindo cada passo:
   O [`PLAN.md`](PLAN.md) tem as etapas, as decisões com o motivo e um registro datado de cada mudança de rumo.
 - **Regras fixas.** Defini as regras que o assistente segue em toda sessão: dinheiro em centavos, zod em
   toda entrada externa, o código conferindo o que o modelo decide e testes sem rede e sem LLM.
-- **Etapas pequenas e revisadas.** Cada etapa passou pela minha revisão antes do commit, um passo por commit.
 - **Teste além do automático.** Rodei o pedido de exemplo com a chave real, testei o chat à mão e usei uma
   compradora simulada por um subagente, que escreve como gente escreve ("notebook", sem acento).
 - **Revisão antes da entrega.** Conferência item a item contra o enunciado, ensaio em clone limpo e revisão

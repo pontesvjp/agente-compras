@@ -18,7 +18,7 @@ navegador ──:8080──► chat (React, servido por nginx)
 1. O chat manda o pedido para `POST /api/requisicoes`.
 2. O backend entrega ao modelo o pedido, o prompt e as ferramentas que leu do servidor MCP.
 3. O modelo pede uma ferramenta, o backend executa no MCP e devolve o resultado. Isso se repete até o modelo responder, com no máximo 8 voltas.
-4. Se achou o que atende, o modelo chama `criar_requisicao`. O servidor MCP confere preço, estoque e pedido mínimo na fonte, aplica a política de compras da tabela e grava numa transação.
+4. Se achou o que atende, o modelo chama `criar_requisicao`. O servidor MCP confere preço, estoque e pedido mínimo na fonte, aplica a política de compras da tabela e grava numa transação. Também confere o teto em dólar que a pessoa escreveu no pedido, lido do banco e não do argumento do modelo, e grava no máximo uma requisição por atendimento.
 5. O backend devolve a requisição lida do banco, a mensagem do modelo e as ferramentas chamadas.
 
 Não existe fluxo fixo no código: quem decide a próxima ferramenta é o modelo. É isso que separa um

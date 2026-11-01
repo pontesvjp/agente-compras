@@ -114,6 +114,7 @@ agente-compras/
 │   │   │   ├── config.ts · logger.ts     variáveis validadas com zod; log JSON (pino)
 │   │   │   ├── dummyjson/
 │   │   │   │   ├── cliente.ts            fetch com timeout, retry e cache
+│   │   │   │   ├── cache.ts              cache em memória com validade, que descarta o que venceu
 │   │   │   │   ├── esquemas.ts           zod da resposta da DummyJSON
 │   │   │   │   └── mapear.ts             produto da DummyJSON → campos que o modelo vê
 │   │   │   └── ferramentas/
@@ -144,10 +145,10 @@ agente-compras/
 │       └── test/                         laco.test.ts (LLM falso) · openrouter.test.ts · rotas.test.ts
 ├── packages/
 │   ├── shared/
-│   │   ├── src/                          esquemas.ts · dinheiro.ts (centavos) · politica.ts (regras puras) · api.ts (contrato HTTP) · erros.ts (códigos de erro)
-│   │   └── test/                         dinheiro e política, sem banco
+│   │   ├── src/                          esquemas.ts · dinheiro.ts (centavos) · politica.ts (regras puras) · teto-do-pedido.ts (teto em dólar escrito no pedido) · api.ts (contrato HTTP) · erros.ts (códigos de erro)
+│   │   └── test/                         dinheiro, política e teto do pedido, sem banco
 │   └── db/
-│       ├── migrations/                   001_requisicoes · 002_atendimentos · 003_politica_compra (carga + trigger)
+│       ├── migrations/                   001_requisicoes · 002_atendimentos · 003_politica_compra (carga + trigger) · 004_uma_requisicao_por_atendimento
 │       ├── src/                          pool.ts · migrar.ts · requisicoes.ts · politica.ts · atendimentos.ts
 │       └── test/                         migrations, carga inicial e trigger, com Postgres de verdade
 ├── avaliacao/personas.json               personas e resultado esperado
@@ -430,3 +431,5 @@ na seção "Para produção, eu faria", com uma linha cada, sem gastar o prazo.
 | 01/11/2026 | Ensaio em clone limpo do GitHub, seguindo o `INSTALAR.md`: do zero aos quatro serviços saudáveis em 56 s, chat e rotas funcionando, testes passando, nenhuma chave no histórico. Os comandos de teste passam a usar `--build` | O serviço `testes` está num perfil e o `docker compose run` reaproveitava uma imagem antiga: o ensaio rodou 91 testes em vez de 92 até a correção |
 | 01/11/2026 | Revisão de segurança antes da entrega: chat só em `127.0.0.1`, `PUT /politica` com `POLITICA_TOKEN`, `X-Forwarded-For` e `x-atendimento-id` vindos de fora descartados no nginx, `Origin` checado no `/mcp`, cabeçalhos de segurança (CSP) no nginx e CI só com leitura | O ambiente de quem avalia roda com a chave da OpenRouter no `.env`. Nada disso muda o `docker compose up` nem o pedido de exemplo; o que ficou de fora está em `docs/seguranca.md` |
 | 01/11/2026 | Depois da revisão de segurança: novo ensaio em clone limpo (quatro serviços saudáveis em 54 s, 95 testes passando) e conferência dos documentos contra o código, que corrigiu nomes de campo, rotas com token, árvore de pastas e comandos | O plano tinha ficado para trás do código |
+| 01/11/2026 | Duas regras que dependiam do modelo passaram para o código: o teto em dólar escrito no pedido, lido de `atendimentos.pedido` e não do argumento do modelo, e uma requisição por atendimento (trava da linha do atendimento e índice único). A Idempotency-Key devolve a requisição gravada mesmo se o atendimento anterior caiu antes de concluir. Também: argumento fora do schema vira `PEDIDO_INVALIDO` na trilha, o cache da busca descarta o que venceu, `requisicoes.atendimento_id` ganhou chave estrangeira e o `requestIdLogLabel` obsoleto do Fastify deu lugar ao `logController` | Revisão do código antes da entrega: se o modelo não repassasse `preco_maximo_unitario_usd`, "10 iPhones até US$ 50" gravava como aprovada; e duas chamadas de `criar_requisicao` no mesmo pedido fracionavam a compra abaixo da alçada |
+| 01/11/2026 | Novo ensaio em clone limpo depois dessas correções: quatro serviços saudáveis em 33 s, `/health` ok e 129 testes passando no container | O código mudou depois do último ensaio, que tinha 95 testes. O pedido com o LLM não foi refeito: a chave da OpenRouter do `.env` atingiu o limite de crédito, e o backend respondeu `LLM_CHAVE_INVALIDA` com a mensagem certa |
