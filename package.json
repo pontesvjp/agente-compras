@@ -7,11 +7,12 @@
   },
   "workspaces": [
     "packages/*",
-    "services/*"
+    "services/*",
+    "apps/*"
   ],
   "scripts": {
     "build": "tsc -b",
-    "typecheck": "tsc -b && tsc -p tsconfig.test.json",
+    "typecheck": "tsc -b && tsc -p tsconfig.test.json && tsc -p apps/chat",
     "lint": "biome check .",
     "format": "biome check --write .",
     "test": "vitest run",

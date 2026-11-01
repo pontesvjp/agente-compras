@@ -1,0 +1,38 @@
+/*
+ * Tokens públicos do Eletro Design System (eletrods.me.com.br, conferidos em 30/10/2026).
+ * Os `--me-*` seguem o nome do Eletro. Os `--ac-*` são tons dos mockups que não conferi no Eletro.
+ */
+:root {
+  --me-font-family: "Roboto", "Segoe UI", Arial, sans-serif;
+  --ac-font-mono: "Roboto Mono", ui-monospace, monospace;
+
+  --me-primary-1: #0a0a93;
+  --me-primary-2: #1052e0;
+  --ac-primary-claro: #edf3ff;
+  --ac-primary-borda: #d0e0ff;
+  --ac-primary-desligado: #9db4e8;
+  --ac-primary-no-escuro: #8fb4ff;
+
+  --ac-gray-escuro: #1b2329;
+  --me-gray--1: #262f35;
+  --me-gray-0: #303e49;
+  --me-gray-1: #566574;
+  --me-gray-3: #b7c1ca;
+  --me-gray-5: #e2e6e9;
+  --me-gray-6: #f1f3f5;
+  --me-white: #ffffff;
+  --me-bg-gray: #f7f8fa;
+
+  --me-success-0: #0c4933;
+  --ac-success-fundo: #e9f7f2;
+  --me-warning-0: #805e07;
+  --ac-warning-texto: #5c4305;
+  --ac-warning-fundo: #fff4d8;
+  --me-danger-0: #811f2c;
+  --ac-danger-icone: #b8293b;
+  --ac-danger-borda: #ffb5c2;
+  --ac-danger-fundo: #ffedf0;
+
+  --me-shadow-level-1: 0px 4px 8px rgba(0, 0, 0, 0.08);
+  --me-border-radius: 8px;
+}
