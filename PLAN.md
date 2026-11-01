@@ -94,13 +94,17 @@ agente-compras/
 ├── apps/chat/                            React + Vite; o nginx serve o build e repassa /api, /requisicoes e /mcp
 │   ├── index.html · nginx.conf · vite.config.ts
 │   └── src/
-│       ├── main.tsx · App.tsx · estilos.css
-│       ├── api.ts                        chamadas ao backend, com os tipos do packages/shared
+│       ├── main.tsx · App.tsx · tokens.css (Eletro DS) · estilos.css
+│       ├── api.ts                        chamadas ao backend, validadas com os schemas do packages/shared
+│       ├── passos.ts                     mapa ferramenta → frase de quem compra, com os números do resultado
+│       ├── formato.ts · turnos.ts        dinheiro e hora em pt-BR; estado de cada pedido da sessão
 │       └── componentes/
-│           ├── Conversa.tsx
+│           ├── Conversa.tsx · RespostaAgente.tsx
 │           ├── CartaoRequisicao.tsx      montado com os dados do banco, nunca com o texto do modelo
-│           ├── FerramentasChamadas.tsx
-│           └── ListaRequisicoes.tsx
+│           ├── FerramentasChamadas.tsx   passos em português, ou o painel de "Detalhes técnicos"
+│           ├── AlertaErro.tsx            título pelo código do erro, não pelo texto do modelo
+│           └── ListaRequisicoes.tsx · Resumo.tsx · Cabecalho.tsx · Icone.tsx
+│   └── test/passos.test.ts
 ├── services/
 │   ├── mcp-server/
 │   │   ├── src/
@@ -283,8 +287,7 @@ O histórico vai junto na entrega, então os commits são pequenos e na ordem em
 3. Mostra as ferramentas chamadas (diferencial opcional do case) **em linguagem de quem compra**, sempre visível: "Consultei o catálogo: 5 laptops encontrados", "Conferi a política de compras: teto de US$ 2.500 por laptop", "Gravei a requisição". O texto de cada passo sai de um mapa ferramenta → frase no front, com os números do resultado da ferramenta. O detalhe de dev (`buscar_produtos("laptop") · 5 resultados · 380 ms`) fica atrás do botão "Detalhes técnicos", **desligado por padrão**; o README diz ao avaliador onde ligar. A trilha completa continua em `GET /atendimentos/:id`.
 4. Estados claros: carregando ("consultando o catálogo…"), não atendida (o que falta), catálogo fora, chave expirada.
 5. Lista das requisições salvas (`GET /requisicoes`) numa aba.
-6. Aba "Regras": mostra e edita a política (`GET/PUT /politica`). É a demonstração de baixar o teto de laptops para US$ 1.000 e ver o mesmo pedido virar "não atendida", sem reiniciar nada.
-- Commits: `feat: chat em React com cartão da requisição e ferramentas chamadas` → `feat: aba de regras da política de compras`
+- Commits: `feat: resultado de cada ferramenta na trilha` → `feat: chat em React com cartão da requisição e ferramentas chamadas`
 
 ### Etapa 5 · Docker (dom)
 1. Um `Dockerfile` na raiz, multi-stage, com os targets `mcp-server`, `backend`, `chat` (build com Node, servido por nginx) e `testes`. Usuário não-root, `npm ci` numa camada compartilhada, imagem final só com o build. `.dockerignore` com `.env`, `case/`, `node_modules` e `.git`.
@@ -406,3 +409,4 @@ na seção "Para produção, eu faria", com uma linha cada, sem gastar o prazo.
 | 01/11/2026 | Corte de escopo: saíram aprovar/reprovar, alçada por solicitante, sinônimos, trava do texto, aba "Regras", modo consultivo (`sugerir_para_necessidade`), data de necessidade e webhook. O migrador roda só no boot do mcp-server | No domingo à tarde ainda não havia código, e o Docker precisou ser instalado (com WSL2). O case avalia mais integração e "funciona" do que sofisticação. O visual com os tokens do Eletro ficou, porque é só CSS e o mockup já está nele |
 | 01/11/2026 | Status da requisição renomeados: `aberta` virou `aprovada` e `aguardando_aprovacao` virou `em_aprovacao`, com `reprovada` para a decisão negativa | São os nomes que o padrão de Requisição do guia de design do ME usa (Rascunho, Em aprovação, Aprovado, Reprovado). O mockup foi ajustado no mesmo dia ao Eletro DS e ao padrão do chat de IA deles |
 | 01/11/2026 | Backend: uma sessão MCP por atendimento em vez de conexão longa com reconexão; códigos de erro `NAO_ENCONTRADO`, `MUITOS_PEDIDOS` e `ERRO_INTERNO`; requisição já gravada vale mesmo se o modelo falhar depois; Idempotency-Key espera o pedido em andamento | O MCP é stateless: abrir por atendimento leva os headers `x-atendimento-id` e `x-request-id` e elimina o caso de conexão caída. Os códigos novos cobrem 404, 429 e 500 com o mesmo formato `{codigo, mensagem}`. Responder erro depois de gravar faria a pessoa pedir de novo e duplicar a compra; o duplo clique chega enquanto o primeiro pedido ainda roda |
+| 01/11/2026 | A trilha do atendimento passa a guardar o resultado estruturado de cada ferramenta | O chat descreve cada passo com os números que a ferramenta devolveu ("5 resultados, de US$ 1.099,99 a US$ 1.999,99"), sem depender do texto do modelo, e a auditoria em `GET /atendimentos/:id` mostra o que o modelo viu em cada chamada |

@@ -32,7 +32,8 @@ Pré-requisito: Docker com Compose v2. Nada mais na máquina.
    ```bash
    docker compose up --build
    ```
-4. Abra **http://localhost:8080** e escreva o pedido.
+4. Abra **http://localhost:8080** e escreva o pedido. O botão **Detalhes técnicos**, no alto da conversa,
+   mostra cada ferramenta chamada com argumentos, tempo, tokens e custo.
 
 Pela API:
 
@@ -318,7 +319,7 @@ Os dois arquivos que mostram esse processo ficam no repositório:
 - [x] Postgres com migrations e `criar_requisicao` com as travas
 - [x] Política de compras em tabela, com histórico e `consultar_politica`
 - [x] Backend com o laço do agente, a trilha de atendimentos e as métricas
-- [ ] Chat em React
+- [x] Chat em React
 - [ ] Docker Compose com as quatro peças
 - [ ] Avaliação com 6 pedidos, CI e selo de alçada
 - [ ] Ensaio em clone limpo e entrega
