@@ -32,6 +32,11 @@ const DESCRICAO = [
   'Quando não chamar: para validar a compra. Quem garante a regra é criar_requisicao, que confere tudo de novo ao gravar.',
 ].join(' ');
 
+/** O modelo às vezes escreve a categoria no plural ("motorcycles"): singular e plural valem igual. */
+function mesmaCategoria(cadastrada: string, pedida: string): boolean {
+  return cadastrada === pedida || `${cadastrada}s` === pedida || cadastrada === `${pedida}s`;
+}
+
 export async function executarConsultarPolitica(
   pool: Pool,
   args: { categoria?: string | undefined },
@@ -41,14 +46,14 @@ export async function executarConsultarPolitica(
     const politica = politicaEmUsd(await lerPolitica(pool));
     const categoria = args.categoria?.trim().toLowerCase();
     const regras = politica.categorias.filter(
-      (regra) => categoria === undefined || regra.categoria === categoria,
+      (regra) => categoria === undefined || mesmaCategoria(regra.categoria, categoria),
     );
     return resultadoOk({
       ...politica,
       categorias: regras,
       ...(categoria !== undefined && regras.length === 0
         ? {
-            observacao: `A categoria "${categoria}" não tem regra própria: valem a alçada geral e o valor máximo por requisição.`,
+            observacao: `A categoria "${categoria}" não tem regra própria: valem a alçada geral e o valor máximo por requisição. Categorias com regra: ${politica.categorias.map((r) => r.categoria).join(', ')}.`,
           }
         : {}),
     });

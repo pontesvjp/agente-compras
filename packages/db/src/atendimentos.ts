@@ -90,6 +90,14 @@ export async function concluirAtendimento(
   );
 }
 
+const linhaSolicitante = z.object({ solicitante: z.string().nullable() });
+
+/** O solicitante que a pessoa informou no chat ao abrir o atendimento, se informou. */
+export async function solicitanteDoAtendimento(db: Executor, id: string): Promise<string | null> {
+  const { rows } = await db.query('select solicitante from atendimentos where id = $1', [id]);
+  return rows.length === 0 ? null : linhaSolicitante.parse(rows[0]).solicitante;
+}
+
 /** Solta a chave de um atendimento que terminou em erro, para o mesmo pedido poder ser refeito. */
 export async function liberarChaveIdempotencia(db: Executor, id: string): Promise<void> {
   await db.query('update atendimentos set idempotency_key = null where id = $1', [id]);

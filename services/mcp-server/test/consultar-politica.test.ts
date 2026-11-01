@@ -43,6 +43,18 @@ describe('consultar_politica', () => {
     ]);
   });
 
+  it('aceita a categoria no plural, como o modelo às vezes escreve', async () => {
+    const resultado = await executarConsultarPolitica(
+      pool,
+      { categoria: 'motorcycles' },
+      loggerSilencioso,
+    );
+
+    expect(resultado.structuredContent?.categorias).toEqual([
+      expect.objectContaining({ categoria: 'motorcycle', permitida: false }),
+    ]);
+  });
+
   it('avisa quando a categoria não tem regra própria', async () => {
     const resultado = await executarConsultarPolitica(
       pool,
@@ -52,5 +64,6 @@ describe('consultar_politica', () => {
 
     expect(resultado.structuredContent).toMatchObject({ categorias: [] });
     expect(resultado.structuredContent?.observacao).toContain('valem a alçada geral');
+    expect(resultado.structuredContent?.observacao).toContain('Categorias com regra: beauty');
   });
 });

@@ -1,4 +1,10 @@
-import { emTransacao, inserirRequisicao, lerPolitica, type Pool } from '@agente-compras/db';
+import {
+  emTransacao,
+  inserirRequisicao,
+  lerPolitica,
+  type Pool,
+  solicitanteDoAtendimento,
+} from '@agente-compras/db';
 import {
   avaliarRequisicao,
   centavosParaUsd,
@@ -43,11 +49,14 @@ export const entradaCriarRequisicao = {
     .min(1)
     .max(120)
     .optional()
-    .describe('Quem pediu (pessoa ou time), se a pessoa disse.'),
+    .describe(
+      'Quem pediu (pessoa ou time), se a pessoa disse. Se o chat informou o solicitante, vale o do chat.',
+    ),
 };
 
 export const saidaCriarRequisicao = {
   numero: z.string(),
+  solicitante: z.string().nullable(),
   status: z.enum(['aprovada', 'em_aprovacao']),
   motivo_status: z.string(),
   itens: z.array(
@@ -147,8 +156,13 @@ export async function executarCriarRequisicao(
           { detalhes: { violacoes: avaliacao.violacoes } },
         );
       }
+      // O solicitante do formulário vence o que o modelo mandar: quem pediu não é decisão do modelo.
+      const doChat = deps.atendimentoId
+        ? await solicitanteDoAtendimento(tx, deps.atendimentoId)
+        : null;
+      const solicitante = doChat ?? args.solicitante ?? null;
       const criada = await inserirRequisicao(tx, {
-        solicitante: args.solicitante ?? null,
+        solicitante,
         justificativa: args.justificativa,
         status: avaliacao.status,
         valor_total_centavos: avaliacao.valor_total_centavos,
@@ -156,7 +170,7 @@ export async function executarCriarRequisicao(
         atendimento_id: deps.atendimentoId,
         itens: avaliacao.itens,
       });
-      return { avaliacao, criada };
+      return { avaliacao, criada: { ...criada, solicitante } };
     });
 
     const alcada = `${formatarUsd(avaliacao.regras_aplicadas.alcada_centavos)} (${avaliacao.regras_aplicadas.origem_alcada})`;
@@ -171,6 +185,7 @@ export async function executarCriarRequisicao(
     );
     return resultadoOk({
       numero: criada.numero,
+      solicitante: criada.solicitante,
       status: avaliacao.status,
       motivo_status:
         avaliacao.status === 'em_aprovacao'

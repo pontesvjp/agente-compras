@@ -60,6 +60,13 @@ function resposta(
   };
 }
 
+/** O solicitante do formulário vai junto, para o modelo não dizer que ele não foi informado. */
+function textoParaModelo(entrada: EntradaAtendimento): string {
+  return entrada.solicitante === null
+    ? entrada.pedido
+    : `${entrada.pedido}\n\n(Solicitante informado no formulário: ${entrada.solicitante})`;
+}
+
 /** Espera o atendimento com a mesma chave terminar (duplo clique chega enquanto o primeiro roda). */
 async function aguardarConclusao(
   deps: DependenciasAtendimento,
@@ -147,7 +154,7 @@ async function executar(
     let mensagem: string;
     try {
       ({ mensagem } = await rodarLaco({
-        pedido: entrada.pedido,
+        pedido: textoParaModelo(entrada),
         prompt: deps.prompt,
         modelo: deps.modelo,
         executor: sessao,

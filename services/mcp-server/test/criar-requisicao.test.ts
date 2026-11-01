@@ -1,4 +1,5 @@
-import type { Pool } from '@agente-compras/db';
+import { randomUUID } from 'node:crypto';
+import { iniciarAtendimento, type Pool } from '@agente-compras/db';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { prepararBancoTeste } from '../../../packages/db/test/apoio-banco.js';
 import { executarCriarRequisicao } from '../src/ferramentas/criar-requisicao.js';
@@ -158,5 +159,32 @@ describe('criar_requisicao', () => {
     );
 
     expect(erro.codigo).toBe('PEDIDO_INVALIDO');
+  });
+
+  it('o solicitante informado no chat vence o que o modelo mandar', async () => {
+    produtoNaFonte(81);
+    const atendimentoId = randomUUID();
+    await iniciarAtendimento(pool, {
+      id: atendimentoId,
+      pedido: '1 notebook pro financeiro',
+      solicitante: 'Clínicas Carla',
+      idempotency_key: null,
+    });
+
+    const resultado = await executarCriarRequisicao(
+      { cliente: clienteComMock(agente), pool, logger: loggerSilencioso, atendimentoId },
+      {
+        itens: [{ produto_id: 81, quantidade: 1 }],
+        justificativa: 'notebook pro financeiro',
+        solicitante: 'Financeiro',
+      },
+    );
+
+    expect(resultado.structuredContent).toMatchObject({ solicitante: 'Clínicas Carla' });
+    const { rows } = await pool.query(
+      'select solicitante from requisicoes where atendimento_id = $1',
+      [atendimentoId],
+    );
+    expect(rows).toEqual([{ solicitante: 'Clínicas Carla' }]);
   });
 });
