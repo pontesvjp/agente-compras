@@ -155,6 +155,8 @@ agente-compras/
 ├── biome.json · vitest.config.ts
 ├── .env.example · .gitignore · .gitattributes
 ├── README.md · CLAUDE.md · PLAN.md
+├── INSTALAR.md                           prompt para o agente de IA de quem quiser instalar e rodar o projeto
+├── AGENTS.md                             aponta o INSTALAR.md para Codex, Cursor e Copilot (o CLAUDE.md abre com o mesmo aviso)
 └── case/                                 enunciado, fora do git
 ```
 
@@ -410,3 +412,5 @@ na seção "Para produção, eu faria", com uma linha cada, sem gastar o prazo.
 | 01/11/2026 | Status da requisição renomeados: `aberta` virou `aprovada` e `aguardando_aprovacao` virou `em_aprovacao`, com `reprovada` para a decisão negativa | São os nomes que o padrão de Requisição do guia de design do ME usa (Rascunho, Em aprovação, Aprovado, Reprovado). O mockup foi ajustado no mesmo dia ao Eletro DS e ao padrão do chat de IA deles |
 | 01/11/2026 | Backend: uma sessão MCP por atendimento em vez de conexão longa com reconexão; códigos de erro `NAO_ENCONTRADO`, `MUITOS_PEDIDOS` e `ERRO_INTERNO`; requisição já gravada vale mesmo se o modelo falhar depois; Idempotency-Key espera o pedido em andamento | O MCP é stateless: abrir por atendimento leva os headers `x-atendimento-id` e `x-request-id` e elimina o caso de conexão caída. Os códigos novos cobrem 404, 429 e 500 com o mesmo formato `{codigo, mensagem}`. Responder erro depois de gravar faria a pessoa pedir de novo e duplicar a compra; o duplo clique chega enquanto o primeiro pedido ainda roda |
 | 01/11/2026 | A trilha do atendimento passa a guardar o resultado estruturado de cada ferramenta | O chat descreve cada passo com os números que a ferramenta devolveu ("5 resultados, de US$ 1.099,99 a US$ 1.999,99"), sem depender do texto do modelo, e a auditoria em `GET /atendimentos/:id` mostra o que o modelo viu em cada chamada |
+| 01/11/2026 | Entrou o `INSTALAR.md`: um prompt para o agente de IA de quem recebe o case instalar, subir e testar o projeto | Pedido do autor para o e-mail de entrega ("abra no seu agente e peça: siga o INSTALAR.md"). Só instalação e teste, sem alterar código, com a chave pedida à pessoa e nunca mostrada. O `CLAUDE.md` e um `AGENTS.md` abrem com o aviso, para o agente achar o arquivo sozinho |
+| 01/11/2026 | Imagens do backend e do MCP ficaram com cerca de 205 MB de conteúdo, um pouco acima da meta de 200 MB | O binário do Node na `node:22-alpine` sozinho tem 124 MB; as dependências do projeto somam 53 MB. Trocar a imagem base não compensa o risco perto da entrega |

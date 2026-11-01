@@ -35,6 +35,9 @@ Pré-requisito: Docker com Compose v2. Nada mais na máquina.
 4. Abra **http://localhost:8080** e escreva o pedido. O botão **Detalhes técnicos**, no alto da conversa,
    mostra cada ferramenta chamada com argumentos, tempo, tokens e custo.
 
+Com um agente de IA (Claude Code, Codex, Cursor): abra o repositório e peça **"siga o INSTALAR.md"**.
+O [`INSTALAR.md`](INSTALAR.md) é um prompt que instala, sobe e testa o projeto passo a passo.
+
 Pela API:
 
 ```bash
@@ -320,6 +323,6 @@ Os dois arquivos que mostram esse processo ficam no repositório:
 - [x] Política de compras em tabela, com histórico e `consultar_politica`
 - [x] Backend com o laço do agente, a trilha de atendimentos e as métricas
 - [x] Chat em React
-- [ ] Docker Compose com as quatro peças
+- [x] Docker Compose com as quatro peças
 - [ ] Avaliação com 6 pedidos, CI e selo de alçada
 - [ ] Ensaio em clone limpo e entrega
