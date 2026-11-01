@@ -14,7 +14,7 @@ Preço, total e estoque vêm sempre da fonte, nunca do texto do modelo.
 
 Case técnico do processo seletivo de **AI Forward Deployed Engineer** do Mercado Eletrônico
 
-[Rodar](#rodar-em-3-passos) · [Como funciona](#como-funciona) · [Decisões](#decisões) · [Testes](#testes-e-avaliação)
+[Rodar](#rodar-em-3-passos) · [Como funciona](#como-funciona) · [Decisões](#decisões) · [Testes](#testes-e-avaliação) · [Como usei IA](#como-usei-ia)
 
 </div>
 
@@ -149,8 +149,17 @@ O CI roda lint, tipos, testes com Postgres e o build das imagens a cada push.
 
 ## Como usei IA
 
-Usei o **Claude Code** (Anthropic) como par de programação no planejamento, no código e nos testes,
-com revisão minha antes de cada commit.
+Programei com o **Claude Code** (Anthropic) como par, conduzindo cada passo:
+
+- **Plano antes do código.** Li o enunciado e conferi os dados reais da DummyJSON antes de decidir.
+  O [`PLAN.md`](PLAN.md) tem as etapas, as decisões com o motivo e um registro datado de cada mudança de rumo.
+- **Regras fixas.** Defini as regras que o assistente segue em toda sessão: dinheiro em centavos, zod em
+  toda entrada externa, o código conferindo o que o modelo decide e testes sem rede e sem LLM.
+- **Etapas pequenas e revisadas.** Cada etapa passou pela minha revisão antes do commit, um passo por commit.
+- **Teste além do automático.** Rodei o pedido de exemplo com a chave real, testei o chat à mão e usei uma
+  compradora simulada por um subagente, que escreve como gente escreve ("notebook", sem acento).
+- **Revisão antes da entrega.** Conferência item a item contra o enunciado, ensaio em clone limpo e revisão
+  de segurança com a skill `sharp-edges`, da Trail of Bits ([segurança](docs/seguranca.md)).
 
 ## Se algo der errado
 
