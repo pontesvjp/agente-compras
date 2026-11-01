@@ -28,5 +28,8 @@ create table requisicao_itens (
   preco_unitario numeric(12, 2) not null check (preco_unitario >= 0),
   quantidade     integer not null check (quantidade > 0),
   subtotal       numeric(12, 2) not null check (subtotal >= 0),
+  check (subtotal = preco_unitario * quantidade),
   unique (requisicao_id, produto_id)
 );
+
+alter sequence requisicao_numero_seq owned by requisicoes.numero;
