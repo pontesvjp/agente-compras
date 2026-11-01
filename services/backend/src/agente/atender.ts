@@ -105,9 +105,14 @@ async function abrirOuReaproveitar(
       );
     }
     const anterior = await aguardarConclusao(deps, inicio.existente);
-    if (anterior.resultado === 'criada' || anterior.resultado === 'nao_atendida') {
-      const requisicao = await requisicaoDoAtendimento(deps.pool, anterior.id);
-      return resposta(anterior.id, requisicao, anterior.mensagem ?? '', anterior);
+    // A requisição gravada vale mesmo se o atendimento anterior caiu antes de concluir.
+    const requisicao = await requisicaoDoAtendimento(deps.pool, anterior.id);
+    if (requisicao) {
+      const mensagem = anterior.mensagem ?? mensagemDaRequisicao(requisicao);
+      return resposta(anterior.id, requisicao, mensagem, anterior);
+    }
+    if (anterior.resultado === 'nao_atendida') {
+      return resposta(anterior.id, null, anterior.mensagem ?? '', anterior);
     }
     await liberarChaveIdempotencia(deps.pool, anterior.id);
   }

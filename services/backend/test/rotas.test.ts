@@ -1,10 +1,12 @@
+import { randomUUID } from 'node:crypto';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import type { Pool } from '@agente-compras/db';
+import { iniciarAtendimento, type Pool } from '@agente-compras/db';
 import type { FastifyInstance } from 'fastify';
 import type { MockAgent } from 'undici';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { prepararBancoTeste } from '../../../packages/db/test/apoio-banco.js';
+import { executarCriarRequisicao } from '../../mcp-server/src/ferramentas/criar-requisicao.js';
 import { criarServidorHttp } from '../../mcp-server/src/http.js';
 import {
   BASE_URL,
@@ -218,6 +220,127 @@ describe('POST /requisicoes', () => {
     expect(segundo.headers['idempotent-replayed']).toBe('true');
     expect(segundo.json()).toEqual(primeiro.json());
     expect(llm.recebido).toHaveLength(3);
+  });
+
+  it('o modelo chama criar_requisicao duas vezes na mesma volta: grava uma só e a resposta é ela', async () => {
+    const criar = (quantidade: number) => ({
+      nome: 'criar_requisicao',
+      argumentos: { itens: [{ produto_id: 81, quantidade }], justificativa: 'time' },
+    });
+    const app = await subir(
+      llmRoteirizado([
+        { chamadas: [criar(3), criar(2)] },
+        { texto: 'Criei a requisição com os laptops.' },
+      ]).modelo,
+    );
+    catalogoDeLaptops();
+
+    const resposta = await pedir(app, { pedido: '5 laptops para o time' });
+    const corpo = resposta.json();
+
+    expect(resposta.statusCode).toBe(201);
+    expect(corpo.resultado).toBe('criada');
+    const erros = corpo.ferramentas.filter((f: { ok: boolean }) => !f.ok);
+    expect(erros).toHaveLength(1);
+    expect(erros[0]).toMatchObject({ erro_codigo: 'REGRA_VIOLADA' });
+    expect(JSON.stringify(erros[0].resultado)).toContain(corpo.requisicao.numero);
+    const { rows } = await pool.query(
+      'select count(*)::int as n from requisicoes where atendimento_id = $1',
+      [corpo.atendimento_id],
+    );
+    expect(rows[0]).toEqual({ n: 1 });
+  });
+
+  it('"10 iPhones até US$ 50" sem o modelo passar o limite: o código barra e nada é gravado', async () => {
+    const app = await subir(
+      llmRoteirizado([
+        {
+          chamadas: [
+            {
+              nome: 'criar_requisicao',
+              argumentos: { itens: [{ produto_id: 121, quantidade: 10 }], justificativa: 'time' },
+            },
+          ],
+        },
+        { texto: 'Não criei a requisição: o iPhone mais barato passa de US$ 50.' },
+      ]).modelo,
+    );
+    dummy
+      .get(BASE_URL)
+      .intercept({ path: '/products/121' })
+      .reply(200, fixture('produto-121.json'));
+
+    const resposta = await pedir(app, { pedido: '10 iPhones até US$ 50' });
+
+    expect(resposta.json()).toMatchObject({
+      resultado: 'nao_atendida',
+      requisicao: null,
+      ferramentas: [{ nome: 'criar_requisicao', ok: false, erro_codigo: 'REGRA_VIOLADA' }],
+    });
+    const { rows } = await pool.query(
+      'select count(*)::int as n from requisicoes where atendimento_id = $1',
+      [resposta.json().atendimento_id],
+    );
+    expect(rows[0]).toEqual({ n: 0 });
+  });
+
+  it('argumento fora do schema da ferramenta vira PEDIDO_INVALIDO na trilha, não ERRO_INTERNO', async () => {
+    const app = await subir(
+      llmRoteirizado([
+        {
+          chamadas: [
+            { nome: 'criar_requisicao', argumentos: { itens: [], justificativa: 'time' } },
+          ],
+        },
+        { texto: 'Não criei a requisição.' },
+      ]).modelo,
+    );
+
+    const resposta = await pedir(app, { pedido: '5 laptops para o time' });
+
+    expect(resposta.json().ferramentas).toMatchObject([
+      { nome: 'criar_requisicao', ok: false, erro_codigo: 'PEDIDO_INVALIDO' },
+    ]);
+  });
+
+  it('Idempotency-Key de um atendimento que caiu depois de gravar: devolve a requisição gravada, sem gravar outra', async () => {
+    const llm = llmRoteirizado([]);
+    const app = await subir(llm.modelo);
+    catalogoDeLaptops();
+    const anterior = randomUUID();
+    await iniciarAtendimento(pool, {
+      id: anterior,
+      pedido: PEDIDO_EXEMPLO,
+      solicitante: null,
+      idempotency_key: 'caiu-no-meio',
+    });
+    await pool.query(
+      "update atendimentos set criado_em = now() - interval '1 minute' where id = $1",
+      [anterior],
+    );
+    await executarCriarRequisicao(
+      { cliente: clienteComMock(dummy), pool, logger: loggerSilencioso, atendimentoId: anterior },
+      { itens: [{ produto_id: 81, quantidade: 3 }], justificativa: 'time de vendas' },
+    );
+
+    const resposta = await pedir(
+      app,
+      { pedido: PEDIDO_EXEMPLO },
+      { 'idempotency-key': 'caiu-no-meio' },
+    );
+
+    expect(resposta.headers['idempotent-replayed']).toBe('true');
+    expect(resposta.json()).toMatchObject({
+      resultado: 'criada',
+      atendimento_id: anterior,
+      requisicao: { valor_total: 3299.97, atendimento_id: anterior },
+    });
+    expect(llm.recebido).toHaveLength(0);
+    const { rows } = await pool.query(
+      "select count(*)::int as n from requisicoes where justificativa = 'time de vendas' and atendimento_id = $1",
+      [anterior],
+    );
+    expect(rows[0]).toEqual({ n: 1 });
   });
 
   it('a mesma Idempotency-Key com outro pedido é recusada', async () => {

@@ -171,13 +171,13 @@ export async function buscarRequisicao(
   return rows.length === 0 ? null : paraRequisicao(rows[0]);
 }
 
-/** A requisição que o atendimento gravou (a mais recente, se o modelo gravou mais de uma). */
+/** A requisição que o atendimento gravou. O índice único garante que é no máximo uma. */
 export async function requisicaoDoAtendimento(
   db: Executor,
   atendimentoId: string,
 ): Promise<RequisicaoGravada | null> {
   const { rows } = await db.query(
-    `${SELECT_REQUISICAO} where r.atendimento_id = $1 group by r.id order by r.id desc limit 1`,
+    `${SELECT_REQUISICAO} where r.atendimento_id = $1 group by r.id`,
     [atendimentoId],
   );
   return rows.length === 0 ? null : paraRequisicao(rows[0]);

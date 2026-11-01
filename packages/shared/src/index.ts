@@ -3,3 +3,4 @@ export * from './dinheiro.js';
 export * from './erros.js';
 export * from './esquemas.js';
 export * from './politica.js';
+export * from './teto-do-pedido.js';

@@ -1,6 +1,6 @@
 import { type ChamadaFerramenta, chamadaFerramentaSchema } from '@agente-compras/shared';
 import { z } from 'zod';
-import type { Executor } from './pool.js';
+import type { ClienteTransacao, Executor } from './pool.js';
 
 export type ResultadoAtendimento = 'criada' | 'nao_atendida' | 'erro';
 
@@ -90,12 +90,21 @@ export async function concluirAtendimento(
   );
 }
 
-const linhaSolicitante = z.object({ solicitante: z.string().nullable() });
+const linhaTravada = z.object({ pedido: z.string(), solicitante: z.string().nullable() });
 
-/** O solicitante que a pessoa informou no chat ao abrir o atendimento, se informou. */
-export async function solicitanteDoAtendimento(db: Executor, id: string): Promise<string | null> {
-  const { rows } = await db.query('select solicitante from atendimentos where id = $1', [id]);
-  return rows.length === 0 ? null : linhaSolicitante.parse(rows[0]).solicitante;
+/**
+ * Trava a linha do atendimento até o fim da transação e devolve o pedido e o solicitante do chat.
+ * Duas chamadas de criar_requisicao no mesmo atendimento passam por aqui uma de cada vez.
+ */
+export async function travarAtendimento(
+  tx: ClienteTransacao,
+  id: string,
+): Promise<z.infer<typeof linhaTravada> | null> {
+  const { rows } = await tx.query(
+    'select pedido, solicitante from atendimentos where id = $1 for no key update',
+    [id],
+  );
+  return rows.length === 0 ? null : linhaTravada.parse(rows[0]);
 }
 
 /** Solta a chave de um atendimento que terminou em erro, para o mesmo pedido poder ser refeito. */

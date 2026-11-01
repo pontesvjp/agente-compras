@@ -1,17 +1,21 @@
 import {
+  type ClienteTransacao,
   emTransacao,
   inserirRequisicao,
   lerPolitica,
   type Pool,
-  solicitanteDoAtendimento,
+  requisicaoDoAtendimento,
+  travarAtendimento,
 } from '@agente-compras/db';
 import {
+  aplicarTetoCitado,
   avaliarRequisicao,
   centavosParaUsd,
   ErroAgente,
   formatarUsd,
   type ItemParaAvaliar,
   paraCentavos,
+  tetoCitadoNoPedido,
 } from '@agente-compras/shared';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
@@ -78,6 +82,7 @@ const DESCRICAO = [
   'Grava a requisição de compra no banco e devolve o número, o status, os itens e o total.',
   'Não recebe preço: lê preço, estoque e pedido mínimo na fonte e aplica a política de compras (categoria bloqueada, teto por unidade, quantidade máxima, valor máximo e alçada).',
   'Quando chamar: depois de buscar_produtos, com os ids que atendem ao pedido.',
+  'Cada pedido grava uma requisição só: com mais de um produto, mande todos os itens na mesma chamada.',
   'Quando não chamar: se nenhum produto atende; nesse caso não grave e diga o que faltou.',
   'Se a política barrar, volta o erro REGRA_VIOLADA com as regras violadas: não tente contornar, explique à pessoa.',
   'Total acima da alçada é gravado com status em_aprovacao.',
@@ -139,6 +144,33 @@ async function lerItensNaFonte(
   );
 }
 
+/**
+ * Trava o atendimento e confere que ele ainda não gravou requisição. Devolve o que o código usa do
+ * pedido original: o teto em dólar que a pessoa escreveu e o solicitante do chat.
+ */
+async function conferirAtendimento(
+  tx: ClienteTransacao,
+  atendimentoId: string | null,
+): Promise<{ tetoCitado: number | null; solicitante: string | null }> {
+  if (atendimentoId === null) return { tetoCitado: null, solicitante: null };
+  const atendimento = await travarAtendimento(tx, atendimentoId);
+  if (!atendimento) {
+    throw new ErroAgente('PEDIDO_INVALIDO', `O atendimento ${atendimentoId} não existe.`);
+  }
+  const anterior = await requisicaoDoAtendimento(tx, atendimentoId);
+  if (anterior) {
+    throw new ErroAgente(
+      'REGRA_VIOLADA',
+      `Este pedido já gravou a requisição ${anterior.numero}, e cada pedido grava uma só. Não grave outra: informe a ${anterior.numero} à pessoa.`,
+      { detalhes: { requisicao_gravada: anterior.numero } },
+    );
+  }
+  return {
+    tetoCitado: tetoCitadoNoPedido(atendimento.pedido),
+    solicitante: atendimento.solicitante,
+  };
+}
+
 export async function executarCriarRequisicao(
   deps: DependenciasCriarRequisicao,
   args: Entrada,
@@ -148,7 +180,11 @@ export async function executarCriarRequisicao(
     const itens = await lerItensNaFonte(deps.cliente, args.itens);
 
     const { avaliacao, criada } = await emTransacao(deps.pool, async (tx) => {
-      const avaliacao = avaliarRequisicao(itens, await lerPolitica(tx));
+      const atendimento = await conferirAtendimento(tx, deps.atendimentoId);
+      const avaliacao = avaliarRequisicao(
+        aplicarTetoCitado(itens, atendimento.tetoCitado),
+        await lerPolitica(tx),
+      );
       if (!avaliacao.aprovavel) {
         throw new ErroAgente(
           'REGRA_VIOLADA',
@@ -157,10 +193,7 @@ export async function executarCriarRequisicao(
         );
       }
       // O solicitante do formulário vence o que o modelo mandar: quem pediu não é decisão do modelo.
-      const doChat = deps.atendimentoId
-        ? await solicitanteDoAtendimento(tx, deps.atendimentoId)
-        : null;
-      const solicitante = doChat ?? args.solicitante ?? null;
+      const solicitante = atendimento.solicitante ?? args.solicitante ?? null;
       const criada = await inserirRequisicao(tx, {
         solicitante,
         justificativa: args.justificativa,

@@ -1,6 +1,7 @@
 import { setTimeout as esperar } from 'node:timers/promises';
 import { ErroAgente } from '@agente-compras/shared';
 import { type Dispatcher, fetch } from 'undici';
+import { criarCache } from './cache.js';
 import {
   buscaDummySchema,
   CAMPOS_BUSCA,
@@ -36,8 +37,7 @@ class FalhaChamada {
 export function criarClienteDummyJson(opcoes: OpcoesClienteDummyJson): ClienteDummyJson {
   const cacheMs = opcoes.cacheMs ?? 60_000;
   const esperaRetryMs = opcoes.esperaRetryMs ?? 300;
-  const agora = opcoes.agora ?? Date.now;
-  const cacheBuscas = new Map<string, { expiraEm: number; produtos: ProdutoDummy[] }>();
+  const cacheBuscas = criarCache<ProdutoDummy[]>(cacheMs, opcoes.agora ?? Date.now);
 
   async function tentar(caminho: string): Promise<unknown> {
     const url = new URL(caminho, opcoes.baseUrl);
@@ -108,12 +108,12 @@ export function criarClienteDummyJson(opcoes: OpcoesClienteDummyJson): ClienteDu
   return {
     async buscar(termo, limite) {
       const caminho = `/products/search?q=${encodeURIComponent(termo)}&limit=${limite}&select=${CAMPOS_BUSCA.join(',')}`;
-      const emCache = cacheBuscas.get(caminho);
-      if (emCache && emCache.expiraEm > agora()) return emCache.produtos;
+      const emCache = cacheBuscas.ler(caminho);
+      if (emCache) return emCache;
 
       const lido = buscaDummySchema.safeParse(await obterJson(caminho));
       if (!lido.success) throw respostaInesperada();
-      cacheBuscas.set(caminho, { expiraEm: agora() + cacheMs, produtos: lido.data.products });
+      cacheBuscas.gravar(caminho, lido.data.products);
       return lido.data.products;
     },
 

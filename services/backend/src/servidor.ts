@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool } from '@agente-compras/db';
 import rateLimit from '@fastify/rate-limit';
-import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyServerOptions, LogController } from 'fastify';
 import { z } from 'zod';
 import type { Atendido, EntradaAtendimento } from './agente/atender.js';
 import { tratarErro } from './erros.js';
@@ -30,7 +30,7 @@ export async function criarServidor(
   const app = Fastify({
     logger: opcoes.logger,
     requestIdHeader: 'x-request-id',
-    requestIdLogLabel: 'request_id',
+    logController: new LogController({ requestIdLogLabel: 'request_id' }),
     genReqId: () => randomUUID(),
     // Só o nginx (o salto 0) é proxy confiável: com `true`, o IP do limite de pedidos viria do
     // primeiro X-Forwarded-For, que o cliente escreve como quiser e assim escaparia do limite.

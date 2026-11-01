@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import type { Pool } from '@agente-compras/db';
+import { iniciarAtendimento, type Pool } from '@agente-compras/db';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -85,6 +85,12 @@ describe('contrato MCP', () => {
     agente.get(BASE_URL).intercept({ path: '/products/81' }).reply(200, fixture('produto-81.json'));
     const { servidor, url } = await subirHttp();
     const atendimentoId = randomUUID();
+    await iniciarAtendimento(pool, {
+      id: atendimentoId,
+      pedido: '3 laptops para o time de vendas',
+      solicitante: null,
+      idempotency_key: null,
+    });
 
     const cliente = new Client({ name: 'teste', version: '1.0.0' });
     await cliente.connect(

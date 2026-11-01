@@ -39,9 +39,16 @@ function jsonOuNulo(texto: string): unknown {
   }
 }
 
-function codigoDoErro(estruturado: unknown): string {
+/**
+ * Argumento fora do schema não chega à ferramenta: o SDK do servidor devolve `isError` com o texto
+ * "MCP error -32602: ...", sem o nosso JSON. É erro do modelo, que pode corrigir e chamar de novo.
+ */
+const ARGUMENTO_INVALIDO = /^MCP error -32602:/;
+
+function codigoDoErro(texto: string, estruturado: unknown): string {
   const lido = erroFerramentaSchema.safeParse(estruturado);
-  return lido.success ? lido.data.codigo : 'ERRO_INTERNO';
+  if (lido.success) return lido.data.codigo;
+  return ARGUMENTO_INVALIDO.test(texto) ? 'PEDIDO_INVALIDO' : 'ERRO_INTERNO';
 }
 
 /** O `$schema` do JSON Schema não interessa ao modelo e alguns provedores recusam. */
@@ -107,7 +114,7 @@ export async function abrirSessaoMcp(url: string, contexto: ContextoSessao): Pro
         const texto = textoDoResultado(resultado.content);
         if (resultado.isError === true) {
           const estruturado = jsonOuNulo(texto);
-          return { ok: false, texto, erro_codigo: codigoDoErro(estruturado), estruturado };
+          return { ok: false, texto, erro_codigo: codigoDoErro(texto, estruturado), estruturado };
         }
         return {
           ok: true,

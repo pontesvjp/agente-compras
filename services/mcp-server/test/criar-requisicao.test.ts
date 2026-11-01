@@ -46,6 +46,31 @@ async function contarRequisicoes(): Promise<number> {
   return (rows[0] as { total: number }).total;
 }
 
+/** O atendimento como o backend abre: o pedido original fica no banco, fora do alcance do modelo. */
+async function novoAtendimento(pedido: string): Promise<string> {
+  const id = randomUUID();
+  await iniciarAtendimento(pool, { id, pedido, solicitante: null, idempotency_key: null });
+  return id;
+}
+
+function criarNoAtendimento(
+  atendimentoId: string,
+  itens: { produto_id: number; quantidade: number; preco_maximo_unitario_usd?: number }[],
+) {
+  return executarCriarRequisicao(
+    { cliente: clienteComMock(agente), pool, logger: loggerSilencioso, atendimentoId },
+    { itens, justificativa: 'pedido do chat' },
+  );
+}
+
+async function requisicoesDoAtendimento(atendimentoId: string): Promise<number> {
+  const { rows } = await pool.query(
+    'select count(*)::int as total from requisicoes where atendimento_id = $1',
+    [atendimentoId],
+  );
+  return (rows[0] as { total: number }).total;
+}
+
 describe('criar_requisicao', () => {
   it('grava o pedido de exemplo com o preço lido na fonte e o total em centavos', async () => {
     produtoNaFonte(81);
@@ -159,6 +184,94 @@ describe('criar_requisicao', () => {
     );
 
     expect(erro.codigo).toBe('PEDIDO_INVALIDO');
+  });
+
+  it('atendimento que não existe no banco: PEDIDO_INVALIDO, sem gravar', async () => {
+    produtoNaFonte(81);
+
+    const erro = erroDaFerramenta(
+      await criarNoAtendimento(randomUUID(), [{ produto_id: 81, quantidade: 1 }]),
+    );
+
+    expect(erro.codigo).toBe('PEDIDO_INVALIDO');
+  });
+
+  it.each([
+    ['iPhones', 121],
+    ['laptops', 81],
+  ] as const)(
+    'o modelo esquece o limite escrito no pedido (10 %s até US$ 50): o código aplica o teto citado',
+    async (produto, id) => {
+      produtoNaFonte(id);
+      const atendimentoId = await novoAtendimento(`10 ${produto} até US$ 50`);
+
+      const erro = erroDaFerramenta(
+        await criarNoAtendimento(atendimentoId, [{ produto_id: id, quantidade: 10 }]),
+      );
+
+      expect(erro.codigo).toBe('REGRA_VIOLADA');
+      expect(erro.mensagem).toContain('acima do limite pedido de US$ 50,00');
+      expect(await requisicoesDoAtendimento(atendimentoId)).toBe(0);
+    },
+  );
+
+  it('o modelo manda um limite maior que o escrito no pedido: vale o do pedido', async () => {
+    produtoNaFonte(81);
+    const atendimentoId = await novoAtendimento('3 laptops até US$ 1.000 cada');
+
+    const erro = erroDaFerramenta(
+      await criarNoAtendimento(atendimentoId, [
+        { produto_id: 81, quantidade: 3, preco_maximo_unitario_usd: 2000 },
+      ]),
+    );
+
+    expect(erro.mensagem).toContain('acima do limite pedido de US$ 1.000,00');
+  });
+
+  it('dentro do limite escrito no pedido, grava mesmo sem o modelo repetir o limite', async () => {
+    produtoNaFonte(81);
+    const atendimentoId = await novoAtendimento(
+      'Preciso de 3 laptops para o time de vendas, até US$ 2.000 cada.',
+    );
+
+    const resultado = await criarNoAtendimento(atendimentoId, [{ produto_id: 81, quantidade: 3 }]);
+
+    expect(resultado.structuredContent).toMatchObject({
+      status: 'aprovada',
+      valor_total_texto: 'US$ 3.299,97',
+    });
+  });
+
+  it('segunda chamada no mesmo atendimento: REGRA_VIOLADA com o número da primeira, sem gravar outra', async () => {
+    produtoNaFonte(81);
+    produtoNaFonte(81);
+    const atendimentoId = await novoAtendimento('5 laptops para o time');
+
+    const primeira = await criarNoAtendimento(atendimentoId, [{ produto_id: 81, quantidade: 4 }]);
+    const erro = erroDaFerramenta(
+      await criarNoAtendimento(atendimentoId, [{ produto_id: 81, quantidade: 1 }]),
+    );
+
+    const numero = (primeira.structuredContent as { numero: string }).numero;
+    expect(erro.codigo).toBe('REGRA_VIOLADA');
+    expect(erro.mensagem).toContain(numero);
+    expect(await requisicoesDoAtendimento(atendimentoId)).toBe(1);
+  });
+
+  it('duas chamadas ao mesmo tempo no mesmo atendimento: só uma grava', async () => {
+    produtoNaFonte(81);
+    produtoNaFonte(81);
+    const atendimentoId = await novoAtendimento('5 laptops para o time');
+
+    const resultados = await Promise.all([
+      criarNoAtendimento(atendimentoId, [{ produto_id: 81, quantidade: 3 }]),
+      criarNoAtendimento(atendimentoId, [{ produto_id: 81, quantidade: 2 }]),
+    ]);
+
+    const erros = resultados.filter((r) => r.isError === true);
+    expect(erros).toHaveLength(1);
+    expect(erros.map((r) => erroDaFerramenta(r).codigo)).toEqual(['REGRA_VIOLADA']);
+    expect(await requisicoesDoAtendimento(atendimentoId)).toBe(1);
   });
 
   it('o solicitante informado no chat vence o que o modelo mandar', async () => {
