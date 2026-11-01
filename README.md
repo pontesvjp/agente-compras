@@ -216,6 +216,10 @@ não no texto do modelo. Mostra acertos, tempo e custo de cada modelo. Os pedido
 `avaliacao/personas.json`; `AVALIAR_RODADAS=5` repete cada um para medir p50 e p95. Para comparar
 modelos, troque `LLM_MODELO` no `.env`, rode `docker compose up -d` e avalie de novo.
 
+Resultado real de 01/11/2026 com `anthropic/claude-haiku-5.5`: **6 de 6 acertos**, conferidos no banco.
+Tempo p50 de 7,7 s e p95 de 12,9 s, custo médio de US$ 0,0015 por pedido e 12 mil tokens de entrada.
+O modelo de reserva (`deepseek/deepseek-v4.1-flash`) ainda não foi avaliado.
+
 | # | Pedido | Esperado |
 |---|---|---|
 | 1 | Preciso de 3 laptops para o time de vendas, até US$ 2.000 cada. | Requisição com 3 laptops de até US$ 2.000 |
@@ -326,5 +330,5 @@ Os dois arquivos que mostram esse processo ficam no repositório:
 - [x] Backend com o laço do agente, a trilha de atendimentos e as métricas
 - [x] Chat em React
 - [x] Docker Compose com as quatro peças
-- [ ] Avaliação com 6 pedidos, CI e selo de alçada
+- [x] Avaliação com 6 pedidos, CI e selo de alçada
 - [ ] Ensaio em clone limpo e entrega
