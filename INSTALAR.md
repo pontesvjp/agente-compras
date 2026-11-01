@@ -75,7 +75,7 @@ A aba **Requisições** lista o que foi gravado.
 ## 6. Testes, se a pessoa quiser
 
 ```bash
-docker compose run --rm testes
+docker compose run --rm --build testes
 ```
 
 Roda lint, checagem de tipos e os testes, sem chave de LLM e sem internet.

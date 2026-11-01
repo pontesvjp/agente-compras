@@ -73,8 +73,8 @@ Todas as escolhas, com o que ficou de fora: [docs/decisoes.md](docs/decisoes.md)
 ## Testes e avaliação
 
 ```bash
-docker compose run --rm testes                    # lint, tipos e 92 testes, sem chave de LLM e sem internet
-docker compose run --rm testes npm run avaliar    # 6 pedidos de personas, conferidos no banco
+docker compose run --rm --build testes                    # lint, tipos e 92 testes, sem chave de LLM e sem internet
+docker compose run --rm --build testes npm run avaliar    # 6 pedidos de personas, conferidos no banco
 ```
 
 Na avaliação real de 01/11/2026 com o Haiku 5.5: **6 de 6 acertos**, tempo p50 de 7,7 s e p95 de

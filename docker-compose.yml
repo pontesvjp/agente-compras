@@ -1,5 +1,5 @@
 # As quatro peças: postgres, mcp-server, backend e chat. Só o chat fica exposto, em ${PORTA:-8080}.
-# O serviço `testes` (e o Postgres dele) só sobe com `docker compose run --rm testes`.
+# O serviço `testes` (e o Postgres dele) só sobe com `docker compose run --rm --build testes`.
 # Variáveis: o compose lê o .env da raiz (modelo em .env.example). Sem ele, tudo sobe com os padrões.
 name: agente-compras
 

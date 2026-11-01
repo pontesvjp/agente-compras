@@ -1,6 +1,6 @@
 /**
  * Avaliação do agente com pedidos de personas, conferida no banco e não no texto do modelo.
- * Precisa do ambiente no ar e de uma chave com crédito: `docker compose run --rm testes npm run avaliar`.
+ * Precisa do ambiente no ar e de uma chave com crédito: `docker compose run --rm --build testes npm run avaliar`.
  * Para comparar modelos, troque LLM_MODELO no .env, rode `docker compose up -d` e avalie de novo.
  */
 import { readFile } from 'node:fs/promises';
