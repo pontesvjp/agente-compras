@@ -1,4 +1,5 @@
-# As quatro peças: postgres, mcp-server, backend e chat. Só o chat fica exposto, em ${PORTA:-8080}.
+# As quatro peças: postgres, mcp-server, backend e chat. Só o chat fica exposto, em ${PORTA:-8080} e só
+# em 127.0.0.1: a chave da OpenRouter e a política ficam fora do alcance de outras máquinas da rede.
 # O serviço `testes` (e o Postgres dele) só sobe com `docker compose run --rm --build testes`.
 # Variáveis: o compose lê o .env da raiz (modelo em .env.example). Sem ele, tudo sobe com os padrões.
 name: agente-compras
@@ -68,7 +69,7 @@ services:
       context: .
       target: chat
     ports:
-      - "${PORTA:-8080}:8080"
+      - "127.0.0.1:${PORTA:-8080}:8080"
     depends_on:
       backend:
         condition: service_healthy
