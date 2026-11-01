@@ -3,6 +3,7 @@
   "references": [
     { "path": "packages/shared" },
     { "path": "packages/db" },
-    { "path": "services/mcp-server" }
+    { "path": "services/mcp-server" },
+    { "path": "services/backend" }
   ]
 }
