@@ -25,7 +25,7 @@ documenta e explica suas decisões"*. A vaga e o blog do ME dizem o que "bem int
 | "Respostas sem invenção" | Critério "Agente e MCP" | A trava fica no **código**: a ferramenta que grava recalcula o preço na fonte e recusa o que viola orçamento, estoque ou pedido mínimo |
 | Tratamento de erro, log, sustentação | Anúncio: "o tratamento de erro, logs e plano de sustentação são parte da entrega" | Timeout, retry, erros com código, log JSON com `request_id` de ponta a ponta |
 | Medir volume, acerto, tempo e falha | Anúncio: "instrumentará a solução… prova de valor" | Tabela de atendimentos (trilha de auditoria) + `GET /metricas` + script de avaliação com taxa de acerto |
-| Alçada e humano no loop | Post "Sistemas multiagentes em compras" do blog do ME (30/09/2026) | Requisição acima da alçada nasce `aguardando_aprovacao` |
+| Alçada e humano no loop | Post "Sistemas multiagentes em compras" do blog do ME (30/09/2026) | Requisição acima da alçada nasce `em_aprovacao` |
 | "Alçada por valor e tipo de compra" e "política de categorias" | Mesmo post do blog do ME | Política de compras em tabela no Postgres (alçada, teto e quantidade por categoria, categoria bloqueada), lida a cada pedido e alterável sem deploy |
 | Integração B2B: auth, webhooks, rate limit, filas | Requisitos da vaga | Idempotency-Key no POST, rate limit, retry com `Retry-After` na OpenRouter |
 | Decidir entre automação tradicional e IA | Anúncio | Conta e validação ficam em código; o LLM só interpreta o pedido e escolhe o produto |
@@ -193,7 +193,7 @@ agente-compras/
 | `GET /atendimentos/:id` | Trilha de auditoria: ferramentas chamadas, argumentos, tempo de cada uma, tokens, custo, modelo |
 | `GET /metricas` | Volume, % atendidas, % não atendidas, % erro, tempo p50/p95, custo médio |
 | `GET /politica` · `PUT /politica` · `PUT /politica/categorias/:categoria` | Lê e altera a política de compras. Vale no pedido seguinte, sem reiniciar nada |
-| `POST /requisicoes/:id/aprovar` · `POST /requisicoes/:id/reprovar` | Decide a requisição que está `aguardando_aprovacao`. Reprovar exige `motivo`; a decisão fica em `aprovacoes` |
+| `POST /requisicoes/:id/aprovar` · `POST /requisicoes/:id/reprovar` | Decide a requisição que está `em_aprovacao`. Reprovar exige `motivo`; a decisão fica em `aprovacoes` |
 | `GET /health` | Banco, MCP e LLM (`sem_chave` se faltar a chave) |
 
 ### Banco
@@ -216,8 +216,9 @@ conversas          (id, criado_em) e mensagens (id, conversa_id, papel, conteudo
 propostas          (id, conversa_id, itens jsonb, criada_em, confirmada_em)   -- só o modo consultivo
 ```
 
-`status` aceita `aberta` ou `aguardando_aprovacao`: acima da alçada da categoria, se houver, senão da
-geral (padrão 5.000). Preço e título são copiados para o item no momento da compra, porque o catálogo
+`status` usa os nomes da requisição no ME: nasce `aprovada` até a alçada e `em_aprovacao` acima da
+alçada da categoria, se houver, senão da geral (padrão 5.000). Aprovar ou reprovar leva a `aprovada`
+ou `reprovada`. Preço e título são copiados para o item no momento da compra, porque o catálogo
 pode mudar depois. A requisição guarda em `regras_aplicadas jsonb` as regras que valiam na hora: a
 auditoria responde "por que esta foi para aprovação" mesmo depois de a política mudar.
 
@@ -323,7 +324,7 @@ O histórico vai junto na entrega, então os commits são pequenos e na ordem em
 
    Antes de fechar, reconferir os dados na DummyJSON, porque ela pode mudar.
 2. GitHub Actions: Biome, typecheck, testes (com serviço Postgres) e `docker compose build`. O workflow roda a cada push e vai junto no zip.
-3. Selo "aguardando aprovação" no chat, com a regra que levou a requisição para a alçada.
+3. Selo "Em aprovação" no chat, com a regra que levou a requisição para a alçada.
 4. **Modo consultivo** (se o núcleo estiver pronto até domingo à noite). A pessoa sabe o problema, mas não sabe o que comprar:
    - o modelo chama `sugerir_para_necessidade` com a descrição, escolhe a necessidade mais provável, busca no catálogo e **propõe** os itens com o porquê;
    - a resposta volta como `precisa_confirmar`, com `conversa_id`, e nada é gravado;
@@ -422,3 +423,4 @@ na seção "Para produção, eu faria", com uma linha cada, sem gastar o prazo.
 | 30/10/2026 | Estrutura de pastas fechada: migrations em `packages/db` com `pg_advisory_lock` no boot dos dois serviços, um Dockerfile com targets, `.dockerignore`, regras de política como funções puras | Os dois serviços usam o banco e o backend depende do MCP: dono único das migrations criaria ciclo no compose. Sem `.dockerignore` a chave poderia entrar na imagem |
 | 30/10/2026 | Conferência do plano contra o enunciado: teste para toda ferramenta do MCP (inclusive as extras), README enxuto com detalhes em `docs/`, `/requisicoes` também direto no nginx, trava do texto aceitando o valor do próprio pedido, rate limit folgado, linha de corte no domingo 18h e regra de que extra não muda o pedido de exemplo | O case exige "um teste para cada ferramenta" e "README em poucas linhas"; o escopo cresceu e o prazo não |
 | 30/10/2026 | Entraram aprovar/reprovar com motivo, alçada por solicitante com validade e, se sobrar tempo, a data de necessidade comparada ao prazo de envio | Vindo do processo de compras do ERP onde trabalho: pedido reprovado fica com motivo e usuário, e o limite de alçada é por pessoa, com data de fim e motivo |
+| 01/11/2026 | Status da requisição renomeados: `aberta` virou `aprovada` e `aguardando_aprovacao` virou `em_aprovacao`, com `reprovada` para a decisão negativa | São os nomes que o padrão de Requisição do guia de design do ME usa (Rascunho, Em aprovação, Aprovado, Reprovado). O mockup foi ajustado no mesmo dia ao Eletro DS e ao padrão do chat de IA deles |

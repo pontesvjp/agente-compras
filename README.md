@@ -11,7 +11,7 @@ você    Preciso de 3 laptops para o time de vendas, até US$ 2.000 cada.
 agente  buscar_produtos("laptop")                              5 resultados · 380 ms
         criar_requisicao([{ produto_id: 81, quantidade: 3 }])               210 ms
 
-        Requisição REQ-000001 · aberta
+        Requisição REQ-000001 · aprovada
         3 × Lenovo Yoga 920          US$ 1.099,99          US$ 3.299,97
                                      Total                 US$ 3.299,97
 ```
@@ -46,7 +46,7 @@ curl -s http://localhost:8080/api/requisicoes \
   "resultado": "criada",
   "requisicao": {
     "numero": "REQ-000001",
-    "status": "aberta",
+    "status": "aprovada",
     "itens": [
       { "produto_id": 81, "titulo": "Lenovo Yoga 920", "quantidade": 3, "preco_unitario": 1099.99, "subtotal": 3299.97 }
     ],
@@ -125,7 +125,7 @@ agente de um bot de roteiro.
 |---|---|---|
 | Nada do catálogo atende | O que faltou: preço mais baixo encontrado, pedido mínimo, estoque | `200`, `nao_atendida` |
 | Pedido fora da política (categoria bloqueada, acima do teto ou da quantidade máxima) | A regra que barrou e o motivo cadastrado | `200`, `nao_atendida` |
-| Total acima da alçada | A requisição é criada com o selo "aguardando aprovação" e a regra que a levou para lá | `201`, `aguardando_aprovacao` |
+| Total acima da alçada | A requisição é criada com o selo "Em aprovação" e a regra que a levou para lá | `201`, `em_aprovacao` |
 | DummyJSON fora ou lenta (5 s, com uma nova tentativa) | "O catálogo de produtos não respondeu. Tente de novo em instantes." | `503`, `CATALOGO_INDISPONIVEL` |
 | Chave da OpenRouter inválida ou vencida | "A chave do modelo de IA é inválida ou venceu. Troque `OPENROUTER_API_KEY` no `.env`." | `503`, `LLM_CHAVE_INVALIDA` |
 | OpenRouter com limite de taxa ou fora | Nova tentativa respeitando `Retry-After`, depois o modelo de reserva; se nada responder, mensagem clara | `503`, `LLM_INDISPONIVEL` |
