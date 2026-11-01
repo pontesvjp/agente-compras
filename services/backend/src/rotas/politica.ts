@@ -8,6 +8,7 @@ import {
 } from '@agente-compras/shared';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
+import { exigirTokenPolitica } from '../autorizacao.js';
 
 const categoriaSchema = z.object({
   categoria: z
@@ -21,15 +22,19 @@ const centavos = (usd: number | undefined) => (usd === undefined ? undefined : p
 const centavosOuNulo = (usd: number | null | undefined) =>
   usd === null || usd === undefined ? usd : paraCentavos(usd);
 
-/** A política é regra de negócio do cliente: muda aqui, vale no pedido seguinte, sem deploy. */
-export function rotasPolitica(deps: { pool: Pool }): FastifyPluginAsync {
+/**
+ * A política é regra de negócio do cliente: muda aqui, vale no pedido seguinte, sem deploy.
+ * Ler é aberto (o agente e o chat leem); mudar exige o token de quem administra a política.
+ */
+export function rotasPolitica(deps: { pool: Pool; tokenPolitica: string }): FastifyPluginAsync {
   const politicaAtual = async (): Promise<PoliticaApi> =>
     politicaEmUsd(await lerPolitica(deps.pool));
+  const protegida = { onRequest: exigirTokenPolitica(deps.tokenPolitica) };
 
   return async (app) => {
     app.get('/', politicaAtual);
 
-    app.put('/', async (request) => {
+    app.put('/', protegida, async (request) => {
       const alteracao = alteracaoPoliticaSchema.parse(request.body);
       await alterarPolitica(deps.pool, {
         criterio_escolha: alteracao.criterio_escolha,
@@ -40,7 +45,7 @@ export function rotasPolitica(deps: { pool: Pool }): FastifyPluginAsync {
       return politicaAtual();
     });
 
-    app.put('/categorias/:categoria', async (request) => {
+    app.put('/categorias/:categoria', protegida, async (request) => {
       const { categoria } = categoriaSchema.parse(request.params);
       const alteracao = alteracaoRegraCategoriaSchema.parse(request.body);
       await salvarRegraCategoria(deps.pool, categoria, {

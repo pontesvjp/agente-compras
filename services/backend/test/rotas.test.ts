@@ -26,6 +26,9 @@ import { llmRoteirizado, type Passo } from './apoio.js';
  * teste, DummyJSON simulada pelo MockAgent e LLM roteirizado.
  */
 
+const TOKEN_POLITICA = 'token-de-teste-com-32-caracteres';
+const COM_TOKEN = { authorization: `Bearer ${TOKEN_POLITICA}` };
+
 const PEDIDO_EXEMPLO = 'Preciso de 3 laptops para o time de vendas, até US$ 2.000 cada.';
 
 const ROTEIRO_EXEMPLO: Passo[] = [
@@ -63,7 +66,7 @@ afterEach(async () => {
   await dummy.close();
 });
 
-async function subir(modelo: ModeloLlm, opcoes: { mcpUrl?: string } = {}) {
+async function subir(modelo: ModeloLlm, opcoes: { mcpUrl?: string; tokenPolitica?: string } = {}) {
   dummy = novoMock();
   mcp = criarServidorHttp({ cliente: clienteComMock(dummy), pool, logger: loggerSilencioso });
   await new Promise<void>((pronto) => mcp.listen(0, '127.0.0.1', pronto));
@@ -86,6 +89,7 @@ async function subir(modelo: ModeloLlm, opcoes: { mcpUrl?: string } = {}) {
         ),
       verificarMcp: async () => true,
       llmConfigurado: true,
+      tokenPolitica: opcoes.tokenPolitica ?? TOKEN_POLITICA,
     },
     { logger: false },
   );
@@ -352,12 +356,14 @@ describe('política pela API', () => {
     const alterada = await app.inject({
       method: 'PUT',
       url: '/politica/categorias/Laptops',
+      headers: COM_TOKEN,
       payload: { teto_unitario_usd: 1000 },
     });
     const pedido = await pedir(app, { pedido: PEDIDO_EXEMPLO });
     await app.inject({
       method: 'PUT',
       url: '/politica/categorias/laptops',
+      headers: COM_TOKEN,
       payload: { teto_unitario_usd: 2500 },
     });
 
@@ -377,20 +383,83 @@ describe('política pela API', () => {
     const geral = await app.inject({
       method: 'PUT',
       url: '/politica',
+      headers: COM_TOKEN,
       payload: { alcada_usd: 4000 },
     });
     const semMotivo = await app.inject({
       method: 'PUT',
       url: '/politica/categorias/tablets',
+      headers: COM_TOKEN,
       payload: { permitida: false },
     });
-    const vazio = await app.inject({ method: 'PUT', url: '/politica', payload: {} });
-    await app.inject({ method: 'PUT', url: '/politica', payload: { alcada_usd: 5000 } });
+    const vazio = await app.inject({
+      method: 'PUT',
+      url: '/politica',
+      headers: COM_TOKEN,
+      payload: {},
+    });
+    await app.inject({
+      method: 'PUT',
+      url: '/politica',
+      headers: COM_TOKEN,
+      payload: { alcada_usd: 5000 },
+    });
 
     expect(geral.json().alcada_geral_usd).toBe(4000);
     expect(semMotivo.statusCode).toBe(400);
     expect(semMotivo.json().codigo).toBe('PEDIDO_INVALIDO');
     expect(vazio.statusCode).toBe(400);
+  });
+  it('mudar a política exige o token certo; sem token configurado, ninguém muda; ler é aberto', async () => {
+    const alterar = (app: FastifyInstance, headers: Record<string, string>) =>
+      app.inject({ method: 'PUT', url: '/politica', headers, payload: { alcada_usd: 1 } });
+    const app = await subir(llmRoteirizado([]).modelo);
+
+    const semCabecalho = await alterar(app, {});
+    const tokenErrado = await alterar(app, {
+      authorization: 'Bearer token-errado-com-32-caracteres',
+    });
+    const semBearer = await alterar(app, { authorization: TOKEN_POLITICA });
+    const categoria = await app.inject({
+      method: 'PUT',
+      url: '/politica/categorias/laptops',
+      payload: { teto_unitario_usd: 1 },
+    });
+    const leitura = await app.inject({ url: '/politica' });
+    const soPolitica = async (tokenPolitica: string) => {
+      const outro = await criarServidor(
+        {
+          pool,
+          atender: async () => {
+            throw new Error('o PUT da política não chama o agente');
+          },
+          verificarMcp: async () => true,
+          llmConfigurado: true,
+          tokenPolitica,
+        },
+        { logger: false },
+      );
+      abertos.push(outro);
+      return outro;
+    };
+    const semConfigurar = await alterar(await soPolitica(''), COM_TOKEN);
+    const tokenCurto = await alterar(await soPolitica('curto'), { authorization: 'Bearer curto' });
+
+    for (const recusa of [
+      semCabecalho,
+      tokenErrado,
+      semBearer,
+      categoria,
+      semConfigurar,
+      tokenCurto,
+    ]) {
+      expect(recusa.statusCode).toBe(403);
+      expect(recusa.json().codigo).toBe('SEM_PERMISSAO');
+    }
+    expect(semConfigurar.json().mensagem).toContain('POLITICA_TOKEN');
+    expect(tokenCurto.json().mensagem).toContain('16 caracteres');
+    expect(leitura.statusCode).toBe(200);
+    expect(leitura.json().alcada_geral_usd).toBe(5000);
   });
 });
 

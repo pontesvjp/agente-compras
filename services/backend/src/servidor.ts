@@ -18,6 +18,8 @@ export interface DependenciasServidor {
   atender: (entrada: EntradaAtendimento) => Promise<Atendido>;
   verificarMcp: () => Promise<boolean>;
   llmConfigurado: boolean;
+  /** POLITICA_TOKEN. Vazio: ninguém altera a política pela API. */
+  tokenPolitica: string;
 }
 
 /** Rotas na raiz: o nginx do chat repassa `/api/*` para cá sem o prefixo. */

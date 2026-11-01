@@ -3,7 +3,7 @@
 # Política de compras
 
 As regras de compra ficam em tabelas do Postgres, não no código. Elas são carregadas por migration
-quando o ambiente sobe e podem ser alteradas pela API.
+quando o ambiente sobe e podem ser alteradas pela API por quem tem o `POLITICA_TOKEN`.
 
 | Regra (carga inicial) | Valor |
 |---|---|
@@ -14,8 +14,12 @@ quando o ambiente sobe e podem ser alteradas pela API.
 | `vehicle`, `motorcycle` | Bloqueadas: "veículo segue o processo de frota" |
 | `fragrances`, `beauty`, `skin-care` | Bloqueadas: "fora da política de compras corporativas" |
 
+Ler a política é aberto. Para alterar, ponha um token de 16 caracteres ou mais em `POLITICA_TOKEN` no
+`.env` (ex.: a saída de `openssl rand -hex 32`), rode `docker compose up -d` e mande o token no cabeçalho:
+
 ```bash
 curl -s -X PUT http://localhost:8080/api/politica/categorias/laptops \
+  -H "authorization: Bearer $POLITICA_TOKEN" \
   -H "content-type: application/json" \
   -d '{"teto_unitario_usd": 1000}'
 ```

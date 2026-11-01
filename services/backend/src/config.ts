@@ -7,6 +7,7 @@ const configSchema = z.object({
   OPENROUTER_BASE_URL: z.url().default('https://openrouter.ai/api/v1'),
   LLM_MODELO: z.string().trim().min(1).default('anthropic/claude-haiku-5.5'),
   LLM_MODELO_RESERVA: z.string().trim().default('deepseek/deepseek-v4.1-flash'),
+  POLITICA_TOKEN: z.string().trim().default(''),
   LLM_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
   BACKEND_PORTA: z.coerce.number().int().positive().default(3000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),

@@ -33,6 +33,7 @@ const app = await criarServidor(
       ),
     verificarMcp: () => mcpNoAr(config.MCP_URL),
     llmConfigurado,
+    tokenPolitica: config.POLITICA_TOKEN,
   },
   { logger: { name: 'backend', level: config.LOG_LEVEL } },
 );

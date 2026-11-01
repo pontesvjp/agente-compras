@@ -9,6 +9,7 @@ export const CODIGOS_ERRO = [
   'PEDIDO_INVALIDO',
   'NAO_ENCONTRADO',
   'MUITOS_PEDIDOS',
+  'SEM_PERMISSAO',
   'ERRO_INTERNO',
 ] as const;
 

@@ -53,6 +53,7 @@ services:
       LLM_MODELO: ${LLM_MODELO:-anthropic/claude-haiku-5.5}
       LLM_MODELO_RESERVA: ${LLM_MODELO_RESERVA-deepseek/deepseek-v4.1-flash}
       LLM_TIMEOUT_MS: ${LLM_TIMEOUT_MS:-60000}
+      POLITICA_TOKEN: ${POLITICA_TOKEN:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     depends_on:
       mcp-server:

@@ -12,7 +12,7 @@ Pelo nginx, todas as rotas ficam sob `/api` (http://localhost:8080/api). `POST /
 | `GET /api/requisicoes/{id}` | Uma requisição |
 | `GET /api/atendimentos/{id}` | Trilha do atendimento: ferramentas, argumentos, tempos, tokens e custo |
 | `GET /api/metricas` | Volume, taxa de atendidas, falhas, tempo p50/p95 e custo médio |
-| `GET /api/politica` · `PUT /api/politica` · `PUT /api/politica/categorias/{categoria}` | Lê e altera a política de compras. Vale no pedido seguinte, sem reiniciar |
+| `GET /api/politica` · `PUT /api/politica` · `PUT /api/politica/categorias/{categoria}` | Lê e altera a política de compras. Vale no pedido seguinte, sem reiniciar. O `PUT` exige `Authorization: Bearer` com o `POLITICA_TOKEN` |
 | `GET /api/health` | Estado do banco, do MCP e da chave do LLM |
 
 ## Pedido de exemplo
