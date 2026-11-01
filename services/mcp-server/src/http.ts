@@ -93,7 +93,12 @@ export function criarServidorHttp(deps: Omit<DependenciasServidor, 'atendimentoI
       const origem = cabecalho(req, 'origin');
       if (!origemPermitida(origem)) {
         logger.warn({ origem }, '/mcp recusado: Origin de fora da máquina');
-        erroJsonRpc(res, 403, -32000, 'Origin não permitido: o /mcp só aceita páginas do localhost.');
+        erroJsonRpc(
+          res,
+          403,
+          -32000,
+          'Origin não permitido: o /mcp só aceita páginas do localhost.',
+        );
         return;
       }
       atenderMcp(req, res, {
